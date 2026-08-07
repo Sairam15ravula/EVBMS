@@ -1,0 +1,6 @@
+{
+  "name": "EV Battery Intelligence Platform",
+  "description": "AI-Driven EV Battery Intelligence Platform featuring predictive health analytics, aging simulation, real-time anomaly detection, and Gemini Digital Doctor AI guidance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,9 @@
+{
+  "model_count": 5,
+  "summary": [
+    "Models were retrained from the CSV files in the datasets folder.",
+    "SOH and RUL use cycle-level battery data.",
+    "Charging class uses the EV charging dataset with categorical encoding.",
+    "Telemetry anomaly uses the telemetry time-series sample and unsupervised anomaly detection."
+  ]
+}
