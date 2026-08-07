@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json());
 
@@ -249,8 +249,8 @@ Provide authoritative, concise, easy-to-understand diagnostic answers to the use
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Battery Intelligence Platform server listening on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`Battery Intelligence Platform server listening on http://localhost:${PORT}`);
   });
 }
 
