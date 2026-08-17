@@ -15,10 +15,10 @@ Requirements for initial enterprise production release.
 
 ### Authentication & User Management (AUTH)
 
-- [ ] **AUTH-01**: User registration, login, password hashing (Argon2 / bcrypt), and JWT access/refresh token issue endpoints.
-- [ ] **AUTH-02**: Role-based Access Control (RBAC) supporting Admin, Fleet Manager, Technician, and Driver roles.
-- [ ] **AUTH-03**: Vehicle asset assignment and organization-level data scoping.
-- [ ] **AUTH-04**: Session persistence and route protection middleware in React frontend and Express/FastAPI backends.
+- [x] **AUTH-01**: User registration, login, password hashing (Argon2 / bcrypt), and JWT access/refresh token issue endpoints.
+- [x] **AUTH-02**: Role-based Access Control (RBAC) supporting Admin, Fleet Manager, Technician, and Driver roles.
+- [x] **AUTH-03**: Vehicle asset assignment and organization-level data scoping.
+- [x] **AUTH-04**: Session persistence and route protection middleware in React frontend and Express/FastAPI backends.
 
 ### Backend APIs & Microservices (BACK)
 
@@ -80,10 +80,10 @@ Deferred features for post-v1 release.
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
 | DATA-03 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
-| AUTH-02 | Phase 2 | Pending |
-| AUTH-03 | Phase 2 | Pending |
-| AUTH-04 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
+| AUTH-02 | Phase 2 | Complete |
+| AUTH-03 | Phase 2 | Complete |
+| AUTH-04 | Phase 2 | Complete |
 | BACK-01 | Phase 3 | Pending |
 | BACK-02 | Phase 3 | Pending |
 | BACK-03 | Phase 3 | Pending |
@@ -109,4 +109,4 @@ Deferred features for post-v1 release.
 
 ---
 *Requirements defined: 2026-08-17*  
-*Last updated: 2026-08-17 after Phase 1 completion*
+*Last updated: 2026-08-17 after Phase 2 completion*
