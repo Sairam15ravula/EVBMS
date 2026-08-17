@@ -4,20 +4,21 @@
 
 ## Must-Have Verification Criteria
 
-1. **Interactive Cell Monitoring Grid (UI-01)**:
-   - `CellGridMonitor.tsx` renders 96 individual cell cards with voltage, thermal heatmap toggle, and cell detail modal.
+1. **Configurable & Chemistry-Aware Cell Grid (UI-01)**:
+   - `CellGridMonitor.tsx` renders dynamic cell count (e.g., 96, 108, 192) and module layout based on battery metadata.
+   - Thresholds adapt dynamically between NMC (4.2V max) and LFP (3.65V max).
 
-2. **Real-Time WebSocket Integration (UI-02)**:
-   - Dashboard establishes WebSocket connection to `/ws/telemetry` and updates metric cards dynamically.
+2. **Client-Side WebSocket Service (UI-02)**:
+   - `telemetrySocket.ts` manages client connection to `/ws/telemetry` without spawning a WebSocket server in React.
+   - Selective subscription updates metric cards without triggering full dashboard re-renders.
 
-3. **Degradation Analytics (UI-03)**:
-   - Recharts degradation curves update dynamically when switching vehicles or stress scenarios.
+3. **Separation of WebSocket vs. REST Transport**:
+   - Live telemetry streams over WebSocket; historical telemetry data uses FastAPI `GET /api/telemetry/history/{vehicle_id}` REST endpoint.
 
-4. **Digital Doctor AI Assistant (UI-04)**:
-   - AI Doctor drawer opens with context pre-populated and displays clean diagnostic conversation history.
-
-5. **Multi-Vehicle Comparison View (UI-05)**:
-   - `BmsComparison.tsx` displays side-by-side comparison of battery health and degradation parameters.
+4. **Grounded AI Doctor & API Vehicle Comparison (UI-04, UI-05)**:
+   - Digital Doctor AI consumes physics/ML evidence.
+   - Vehicle comparison queries backend `/api/vehicles` REST endpoint.
+   - RUL scenario controls are explicitly labeled as "Simulations / Estimated Impact".
 
 ## Automated Verification Steps
 - Build verification: `npm run build`

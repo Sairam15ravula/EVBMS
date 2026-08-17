@@ -2,46 +2,69 @@
 
 *Researched: 2026-08-17*
 
-## Key Technical Decisions & UI Components
+## Key Technical Decisions & Chemistry Thresholds
 
-### 1. 96-Cell Grid Architecture (`CellGridMonitor.tsx`)
-- Grid layout: 12 rows × 8 columns or 8 modules × 12 cells.
-- Cell state color mapping:
-  - `voltage >= 4.2` or `voltage <= 3.0`: `bg-red-500/20 text-red-400 border-red-500/50 animate-pulse`
-  - `delta > 0.050`: `bg-amber-500/20 text-amber-400 border-amber-500/50`
-  - `normal`: `bg-emerald-500/10 text-emerald-300 border-emerald-500/30`
-
-### 2. WebSocket Telemetry Client Hook (`useWebSocketTelemetry.ts`)
+### 1. Chemistry-Aware Voltage & Thermal Threshold Matrix
 ```typescript
-import { useEffect, useState } from 'react';
+export interface ChemistryThresholds {
+  nominalVoltage: number;
+  maxVoltage: number;
+  minVoltage: number;
+  maxCellDeltaMv: number;
+  criticalTempC: number;
+}
+
+export const CHEMISTRY_THRESHOLDS: Record<'NMC' | 'LFP', ChemistryThresholds> = {
+  NMC: {
+    nominalVoltage: 3.70,
+    maxVoltage: 4.20,
+    minVoltage: 3.00,
+    maxCellDeltaMv: 50.0,
+    criticalTempC: 55.0,
+  },
+  LFP: {
+    nominalVoltage: 3.20,
+    maxVoltage: 3.65,
+    minVoltage: 2.50,
+    maxCellDeltaMv: 60.0,
+    criticalTempC: 60.0,
+  },
+};
+```
+
+### 2. Client-Side WebSocket Service (`src/services/telemetrySocket.ts`)
+```typescript
 import { BatteryTelemetry } from '../types';
 
-export function useWebSocketTelemetry(wsUrl: string) {
-  const [telemetry, setTelemetry] = useState<BatteryTelemetry | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+type TelemetryCallback = (data: BatteryTelemetry) => void;
 
-  useEffect(() => {
+class TelemetrySocketClient {
+  private socket: WebSocket | null = null;
+  private subscribers: Set<TelemetryCallback> = new Set();
+
+  public connect(url?: string) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const url = wsUrl || `${protocol}//${host}/ws/telemetry`;
+    const wsUrl = url || `${protocol}//${window.location.host}/ws/telemetry`;
 
-    const ws = new WebSocket(url);
-    ws.onopen = () => setIsConnected(true);
-    ws.onmessage = (evt) => {
+    this.socket = new WebSocket(wsUrl);
+    this.socket.onmessage = (event) => {
       try {
-        const frame = JSON.parse(evt.data);
-        setTelemetry(frame);
+        const frame: BatteryTelemetry = JSON.parse(event.data);
+        this.subscribers.forEach((cb) => cb(frame));
       } catch (e) {}
     };
-    ws.onclose = () => setIsConnected(false);
-    return () => ws.close();
-  }, [wsUrl]);
+  }
 
-  return { telemetry, isConnected };
+  public subscribe(cb: TelemetryCallback) {
+    this.subscribers.add(cb);
+    return () => this.subscribers.delete(cb);
+  }
 }
+
+export const telemetrySocket = new TelemetrySocketClient();
 ```
 
 ## Validation Architecture
 
 ### Verification Commands
-- `npm run dev` and visual UI inspection in browser
+- `npm run build`

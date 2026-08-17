@@ -6,46 +6,55 @@
 <domain>
 ## Phase Boundary
 
-This phase elevates the frontend UI user experience with an interactive 96-cell battery monitoring grid (`CellGridMonitor.tsx`), real-time WebSocket telemetry streaming into `EvBmsPlatform.tsx`, multi-vehicle side-by-side comparison analytics (`BmsComparison.tsx`), and context-aware Digital Doctor AI assistant drawer enhancements.
+This phase elevates the frontend UI user experience:
+1. Dynamic, chemistry-aware cell-level monitoring grid (`CellGridMonitor.tsx`).
+2. Client-side WebSocket telemetry integration (`src/services/telemetrySocket.ts`) connected to Express Gateway.
+3. Multi-vehicle side-by-side comparison analytics (`BmsComparison.tsx`) backed by Phase 3 REST APIs.
+4. Grounded Digital Doctor AI assistant drawer (`DigitalDoctorDrawer.tsx`).
 
 </domain>
 
 <decisions>
-## Implementation Decisions
+## Technical & UI Architecture Constraints
 
-### 1. Interactive Cell-Level Monitoring Grid (`CellGridMonitor.tsx`) (UI-01)
-- Render 96-cell pack architecture (8 modules × 12 cells or 12 modules × 8 cells).
-- Color-coded voltage status:
-  - Normal: 3.65V - 4.15V (Emerald gradient)
-  - Imbalanced delta: > 50mV variance (Amber glow)
-  - Severe Under/Overvoltage: < 3.2V or > 4.25V (Red alert pulse)
-- Thermal Hotspot Heatmap view toggled between Cell Voltage (V) and Cell Temperature (°C).
-- Interactive Cell Detail Modal showing individual cell historical voltage curve, internal resistance, and state of health.
+### 1. Configurable Cell Count & Module Layout
+- `CellGridMonitor.tsx` supports configurable cell counts (e.g. 96, 108, 192) and module arrangements derived dynamically from `vehicle.battery_pack.cell_count` metadata. Cell counts are NOT hardcoded.
 
-### 2. Live WebSocket Dashboard Streaming (`EvBmsPlatform.tsx`) (UI-02)
-- Connect React dashboard to Phase 3 Express WebSocket Gateway (`ws://localhost:3000/ws/telemetry` or relative `wss://`).
-- Automatic reconnection with exponential backoff on disconnect.
-- Smooth metric card counter animations without full page re-renders.
+### 2. Chemistry-Aware Thresholds (NMC vs. LFP)
+- Thresholds are chemistry-aware (`NMC` vs `LFP`):
+  - **NMC**: Nominal ~3.70V, Max 4.20V, Min 3.00V, Max Temp 55°C.
+  - **LFP**: Nominal ~3.20V, Max 3.65V, Min 2.50V, Max Temp 60°C.
+- Thresholds are driven by battery metadata, not blindly hardcoded.
 
-### 3. Advanced Degradation & RUL Scenario Control (`UI-03`)
-- Interactive degradation curves with Recharts displaying actual vs. AI predicted capacity fade curves.
-- Stress scenario controls (Temperature profiles, Fast charging habits, C-rate sliders).
+### 3. Backend Safety State is Authoritative
+- Backend physics/ML safety state (`healthMetrics.anomalies`, Phase 4 `check_independent_safety_rules`) is authoritative. The frontend visualizes state and does NOT independently redefine safety classifications.
 
-### 4. Digital Doctor AI Assistant Enhancements (`UI-04`)
-- Persist conversation history in session state.
-- Suggested quick actions pre-populated from active cell grid anomalies or telemetry alerts.
+### 4. Explicit WebSocket Boundary
+- Express Node server (`server.ts` & `src/services/websocketServer.ts`) owns the WebSocket server.
+- React UI contains strictly a WebSocket client service (`src/services/telemetrySocket.ts` / `useWebSocketTelemetry.ts`). No WebSocket server is created in React.
 
-### 5. Multi-Vehicle Side-by-Side Comparison (`BmsComparison.tsx`) (UI-05)
-- Compare two vehicle pack architectures (e.g. Tesla Model 3 NMC vs. BYD Blade LFP) across SoH, RUL cycles, cell count, thermal resistance, and charging speed.
+### 5. Centralized Live Telemetry & REST Separation
+- Live streaming telemetry flows over WebSocket (`/ws/telemetry`).
+- Historical telemetry data queries use FastAPI REST endpoint `GET /api/telemetry/history/{vehicle_id}` (Phase 3). Large historical datasets are NOT sent over WebSockets.
+- Client state updates selectively to prevent full dashboard re-renders.
+
+### 6. Grounded Digital Doctor & Vehicle Comparison APIs
+- Digital Doctor assistant consumes evidence produced by the physics/ML layer (`xai_explainer.py` & `/api/chat-digital-doctor`).
+- `BmsComparison.tsx` queries vehicle metadata from backend `/api/vehicles` API rather than static inline cards.
+- Scenario stress controls are clearly labeled as "Simulations / Estimated Impact" separate from actual measured RUL predictions.
+
+### 7. Schema & Architecture Preservation
+- Reuses Phase 1-4 Pydantic schemas, TypeScript types (`BatteryTelemetry`, `HealthMetrics`), JWT/RBAC middleware, and ORM repositories.
 
 </decisions>
 
 <canonical_refs>
 ## Canonical References
 
-- `src/EvBmsPlatform.tsx` — Main dashboard application container
-- `src/components/` — Existing UI components (`Header.tsx`, `MetricCards.tsx`, `BmsComparison.tsx`, `DigitalDoctorDrawer.tsx`)
-- `src/services/websocketServer.ts` — Phase 3 WebSocket telemetry gateway
+- `src/EvBmsPlatform.tsx` — Main dashboard container
+- `src/services/telemetrySocket.ts` — React WebSocket client service
+- `src/components/CellGridMonitor.tsx` — Configurable cell grid component
+- `src/components/BmsComparison.tsx` — Multi-vehicle comparison component
 - `.planning/REQUIREMENTS.md` — UI-01 through UI-05 requirements
 
 </canonical_refs>
