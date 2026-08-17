@@ -9,9 +9,9 @@ Requirements for initial enterprise production release.
 
 ### Database Persistence & Data Architecture (DATA)
 
-- [ ] **DATA-01**: PostgreSQL database schema configured with Alembic migrations for user accounts, vehicle assets, battery packs, and diagnostic alert logs.
-- [ ] **DATA-02**: Time-series telemetry storage (TimescaleDB hypertable or optimized partition) for continuous voltage, current, temperature, and SoC/SoH samples.
-- [ ] **DATA-03**: Data access layer / ORM (SQLAlchemy 2.0 async) connecting FastAPI backend services to database.
+- [x] **DATA-01**: PostgreSQL database schema configured with Alembic migrations for user accounts, vehicle assets, battery packs, and diagnostic alert logs.
+- [x] **DATA-02**: Time-series telemetry storage (TimescaleDB hypertable or optimized partition) for continuous voltage, current, temperature, and SoC/SoH samples.
+- [x] **DATA-03**: Data access layer / ORM (SQLAlchemy 2.0 async) connecting FastAPI backend services to database.
 
 ### Authentication & User Management (AUTH)
 
@@ -77,9 +77,9 @@ Deferred features for post-v1 release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
-| DATA-03 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
+| DATA-02 | Phase 1 | Complete |
+| DATA-03 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | AUTH-02 | Phase 2 | Pending |
 | AUTH-03 | Phase 2 | Pending |
@@ -109,4 +109,4 @@ Deferred features for post-v1 release.
 
 ---
 *Requirements defined: 2026-08-17*  
-*Last updated: 2026-08-17 after initial project definition*
+*Last updated: 2026-08-17 after Phase 1 completion*
