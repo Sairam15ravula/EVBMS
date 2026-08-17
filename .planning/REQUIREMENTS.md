@@ -22,10 +22,10 @@ Requirements for initial enterprise production release.
 
 ### Backend APIs & Microservices (BACK)
 
-- [ ] **BACK-01**: Production-grade FastAPI prediction API endpoints with OpenAPI/Swagger documentation, input validation, and standard HTTP error contracts.
-- [ ] **BACK-02**: Real-time battery telemetry streaming server via WebSockets or Server-Sent Events (SSE) in Node/Express.
-- [ ] **BACK-03**: Vehicle fleet management CRUD API endpoints (`/api/vehicles`, `/api/packs`, `/api/alerts`).
-- [ ] **BACK-04**: Health check, metrics, and rate limiting middleware across Express and FastAPI services.
+- [x] **BACK-01**: Production-grade FastAPI prediction API endpoints with OpenAPI/Swagger documentation, input validation, and standard HTTP error contracts.
+- [x] **BACK-02**: Real-time battery telemetry streaming server via WebSockets or Server-Sent Events (SSE) in Node/Express.
+- [x] **BACK-03**: Vehicle fleet management CRUD API endpoints (`/api/vehicles`, `/api/packs`, `/api/alerts`).
+- [x] **BACK-04**: Health check, metrics, and rate limiting middleware across Express and FastAPI services.
 
 ### Advanced AI/ML Inference & Physics Engine (ML)
 
@@ -84,10 +84,10 @@ Deferred features for post-v1 release.
 | AUTH-02 | Phase 2 | Complete |
 | AUTH-03 | Phase 2 | Complete |
 | AUTH-04 | Phase 2 | Complete |
-| BACK-01 | Phase 3 | Pending |
-| BACK-02 | Phase 3 | Pending |
-| BACK-03 | Phase 3 | Pending |
-| BACK-04 | Phase 3 | Pending |
+| BACK-01 | Phase 3 | Complete |
+| BACK-02 | Phase 3 | Complete |
+| BACK-03 | Phase 3 | Complete |
+| BACK-04 | Phase 3 | Complete |
 | ML-01 | Phase 4 | Pending |
 | ML-02 | Phase 4 | Pending |
 | ML-03 | Phase 4 | Pending |
@@ -109,4 +109,4 @@ Deferred features for post-v1 release.
 
 ---
 *Requirements defined: 2026-08-17*  
-*Last updated: 2026-08-17 after Phase 2 completion*
+*Last updated: 2026-08-17 after Phase 3 completion*
