@@ -29,11 +29,11 @@ Requirements for initial enterprise production release.
 
 ### Advanced AI/ML Inference & Physics Engine (ML)
 
-- [ ] **ML-01**: Scalable ML model loader and versioning system serving XGBoost, Random Forest, and Isolation Forest models.
-- [ ] **ML-02**: Hybrid physics + ML State of Charge (SoC) estimation module incorporating Extended Kalman Filtering (EKF) and Coulomb counting.
-- [ ] **ML-03**: Enhanced State of Health (SoH) and Remaining Useful Life (RUL) forecasting service trained on NASA B0005 & CALCE aging benchmarks.
-- [ ] **ML-04**: Automated real-time battery anomaly, cell imbalance, and thermal runaway fault classification engine.
-- [ ] **ML-05**: Explainable AI (XAI) engine generating physical degradation breakdown (SEI growth, lithium plating, thermal stress) with fallback resilience.
+- [x] **ML-01**: Scalable ML model loader and versioning system serving XGBoost, Random Forest, and Isolation Forest models.
+- [x] **ML-02**: Hybrid physics + ML State of Charge (SoC) estimation module incorporating Extended Kalman Filtering (EKF) and Coulomb counting.
+- [x] **ML-03**: Enhanced State of Health (SoH) and Remaining Useful Life (RUL) forecasting service trained on NASA B0005 & CALCE aging benchmarks.
+- [x] **ML-04**: Automated real-time battery anomaly, cell imbalance, and thermal runaway fault classification engine.
+- [x] **ML-05**: Explainable AI (XAI) engine generating physical degradation breakdown (SEI growth, lithium plating, thermal stress) with fallback resilience.
 
 ### Cell-Level Diagnostics & Telemetry Dashboard (UI)
 
@@ -88,11 +88,11 @@ Deferred features for post-v1 release.
 | BACK-02 | Phase 3 | Complete |
 | BACK-03 | Phase 3 | Complete |
 | BACK-04 | Phase 3 | Complete |
-| ML-01 | Phase 4 | Pending |
-| ML-02 | Phase 4 | Pending |
-| ML-03 | Phase 4 | Pending |
-| ML-04 | Phase 4 | Pending |
-| ML-05 | Phase 4 | Pending |
+| ML-01 | Phase 4 | Complete |
+| ML-02 | Phase 4 | Complete |
+| ML-03 | Phase 4 | Complete |
+| ML-04 | Phase 4 | Complete |
+| ML-05 | Phase 4 | Complete |
 | UI-01 | Phase 5 | Pending |
 | UI-02 | Phase 5 | Pending |
 | UI-03 | Phase 5 | Pending |
@@ -109,4 +109,4 @@ Deferred features for post-v1 release.
 
 ---
 *Requirements defined: 2026-08-17*  
-*Last updated: 2026-08-17 after Phase 3 completion*
+*Last updated: 2026-08-17 after Phase 4 completion*
