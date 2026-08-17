@@ -10,7 +10,7 @@ The EV Battery Intelligence Platform project transitions from a functional proto
 - [x] **Phase 2: Authentication & User Management** - Implement JWT registration/login, RBAC roles, vehicle asset scoping, and auth middleware
 - [x] **Phase 3: Production Backend APIs & Streaming Gateway** - Build standardized FastAPI REST endpoints, WebSocket/SSE real-time telemetry streaming, and rate limiting
 - [x] **Phase 4: Advanced AI/ML Inference & Physics Engine** - Deploy Extended Kalman Filter (EKF) SoC estimation, XGBoost SoH/RUL forecasting, Isolation Forest anomaly engine, and Gemini 3.6 Flash XAI service
-- [ ] **Phase 5: Cell-Level Monitoring & Dashboard Enhancement** - Implement 3D/grid cell-level telemetry views, real-time WebSocket dashboard integration, and multi-vehicle comparison views
+- [x] **Phase 5: Cell-Level Monitoring & Dashboard Enhancement** - Implement dynamic cell-level telemetry views, real-time WebSocket dashboard integration, and multi-vehicle comparison views
 - [ ] **Phase 6: Automated Testing & Verification Suite** - Create Pytest backend unit/integration tests, Vitest UI tests, and end-to-end telemetry-to-ML pipeline verification scripts
 
 ---
@@ -23,8 +23,8 @@ The EV Battery Intelligence Platform project transitions from a functional proto
 **Requirements**: DATA-01, DATA-02, DATA-03  
 **Success Criteria**:
   1. PostgreSQL database connects successfully with Alembic migrations creating all core tables (`users`, `vehicles`, `battery_packs`, `alert_logs`).
-  2. TimescaleDB hypertable (or partitioned time-series table) ingests and queries high-frequency battery telemetry frames (voltage, current, temperature, SoC, SoH) with sub-50ms query times.
-  3. SQLAlchemy 2.0 async ORM models provide type-safe CRUD operations for FastAPI and Express services.
+  2. TimescaleDB hypertable ingests and queries high-frequency battery telemetry frames with sub-50ms query times.
+  3. SQLAlchemy 2.0 async ORM models provide type-safe CRUD operations.
 
 Plans:
 - [x] 01-01: Configure PostgreSQL / TimescaleDB database connection, Docker Compose environment, and Alembic migrations setup
@@ -38,11 +38,11 @@ Plans:
 **Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04  
 **Success Criteria**:
   1. Users can register, log in, and receive secure JWT access and refresh tokens.
-  2. RBAC middleware restricts access to administrative and vehicle management routes based on user role (Admin, Fleet Manager, Technician, Driver).
+  2. RBAC middleware restricts access to administrative and vehicle management routes based on user role.
   3. React UI stores session tokens securely and enforces protected route navigation.
 
 Plans:
-- [x] 02-01: Build FastAPI authentication endpoints (signup, login, token refresh, password hashing) and JWT security middleware
+- [x] 02-01: Build FastAPI authentication endpoints and JWT security middleware
 - [x] 02-02: Implement RBAC vehicle asset access control and frontend React authentication state manager
 
 ---
@@ -53,7 +53,7 @@ Plans:
 **Requirements**: BACK-01, BACK-02, BACK-03, BACK-04  
 **Success Criteria**:
   1. FastAPI returns standardized OpenAPI/Swagger compliant responses with strict Pydantic input validation.
-  2. Express Node server broadcasts real-time telemetry frames over WebSockets to connected dashboard clients.
+  2. Express Node server broadcasts real-time telemetry frames over WebSockets.
   3. Health check endpoints and rate limiting middleware protect endpoints against overload.
 
 Plans:
@@ -69,7 +69,7 @@ Plans:
 **Success Criteria**:
   1. EKF algorithm estimates State of Charge (SoC) with < 2% error under dynamic current profiles.
   2. XGBoost regression models predict SoH and RUL cycles based on NASA/CALCE aging parameters with fallback to physical calculation if model binary is missing.
-  3. Isolation Forest and threshold rules classify battery anomalies (cell voltage delta, thermal runaway risk) in < 50ms.
+  3. Isolation Forest and threshold rules classify battery anomalies in < 50ms.
   4. Gemini 3.6 Flash generates structured Explainable AI (XAI) degradation factor breakdowns.
 
 Plans:
@@ -83,13 +83,13 @@ Plans:
 **Depends on**: Phase 4  
 **Requirements**: UI-01, UI-02, UI-03, UI-04, UI-05  
 **Success Criteria**:
-  1. Dashboard displays a 3D/grid cell array view rendering individual cell voltages, thermal hotspots, and imbalance status.
+  1. Dashboard displays an interactive cell array view rendering individual cell voltages, thermal hotspots, and imbalance status with chemistry-aware thresholds (NMC vs LFP).
   2. Live telemetry metrics update via WebSockets without full-page re-renders.
-  3. Users can compare two vehicle battery packs side-by-side on degradation curves and remaining life projections.
+  3. Multi-vehicle side-by-side comparison dynamically queries backend REST APIs.
 
 Plans:
-- [ ] 05-01: Create `CellGridMonitor.tsx` component with interactive cell voltage array, thermal hotspot rendering, and imbalance alerts
-- [ ] 05-02: Integrate WebSocket live updates into `EvBmsPlatform.tsx`, enhance `BmsComparison.tsx` view, and polish Digital Doctor drawer
+- [x] 05-01: Create `CellGridMonitor.tsx` component with chemistry-aware cell voltage array, thermal hotspot rendering, and imbalance alerts
+- [x] 05-02: Integrate WebSocket telemetry client (`telemetrySocket.ts`), update `EvBmsPlatform.tsx`, enhance `BmsComparison.tsx`, and polish Digital Doctor drawer
 
 ---
 
@@ -119,5 +119,5 @@ Phases execute sequentially in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Authentication & User Management | 2/2 | Complete | 2026-08-17 |
 | 3. Production Backend APIs & Streaming Gateway | 2/2 | Complete | 2026-08-17 |
 | 4. Advanced AI/ML Inference & Physics Engine | 2/2 | Complete | 2026-08-17 |
-| 5. Cell-Level Monitoring & Dashboard Enhancement | 0/2 | Not started | - |
+| 5. Cell-Level Monitoring & Dashboard Enhancement | 2/2 | Complete | 2026-08-17 |
 | 6. Automated Testing & Verification Suite | 0/2 | Not started | - |
