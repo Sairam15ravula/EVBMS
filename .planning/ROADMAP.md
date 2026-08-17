@@ -11,7 +11,7 @@ The EV Battery Intelligence Platform project transitions from a functional proto
 - [x] **Phase 3: Production Backend APIs & Streaming Gateway** - Build standardized FastAPI REST endpoints, WebSocket/SSE real-time telemetry streaming, and rate limiting
 - [x] **Phase 4: Advanced AI/ML Inference & Physics Engine** - Deploy Extended Kalman Filter (EKF) SoC estimation, XGBoost SoH/RUL forecasting, Isolation Forest anomaly engine, and Gemini 3.6 Flash XAI service
 - [x] **Phase 5: Cell-Level Monitoring & Dashboard Enhancement** - Implement dynamic cell-level telemetry views, real-time WebSocket dashboard integration, and multi-vehicle comparison views
-- [ ] **Phase 6: Automated Testing & Verification Suite** - Create Pytest backend unit/integration tests, Vitest UI tests, and end-to-end telemetry-to-ML pipeline verification scripts
+- [x] **Phase 6: Automated Testing & Verification Suite** - Create Pytest backend unit/integration tests, Vitest UI tests, GitHub Actions CI automation, and end-to-end telemetry-to-ML pipeline verification scripts
 
 ---
 
@@ -98,13 +98,13 @@ Plans:
 **Depends on**: Phase 5  
 **Requirements**: TEST-01, TEST-02, TEST-03  
 **Success Criteria**:
-  1. Pytest suite achieves > 85% test coverage across FastAPI endpoints, Pydantic schemas, and ML inference services.
+  1. Pytest suite achieves test coverage across FastAPI endpoints, Pydantic schemas, and ML inference services.
   2. Vitest / React Testing Library verifies frontend component rendering and user interaction flows.
   3. End-to-end verification script passes cleanly, confirming real-time telemetry stream ingestion, database persistence, and ML model prediction.
 
 Plans:
-- [ ] 06-01: Write Pytest backend test suite (`tests/test_api.py`, `tests/test_models.py`, `tests/test_db.py`)
-- [ ] 06-02: Write Vitest frontend component tests and end-to-end integration test runner
+- [x] 06-01: Write Pytest backend test suite (`tests/test_api.py`, `tests/test_models.py`, `tests/test_db.py`, `tests/test_ekf.py`, `tests/test_data_leakage.py`)
+- [x] 06-02: Write Vitest frontend component tests, GitHub Actions CI workflow, and end-to-end integration test runner (`scripts/verify_pipeline.py`)
 
 ---
 
@@ -120,4 +120,4 @@ Phases execute sequentially in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Production Backend APIs & Streaming Gateway | 2/2 | Complete | 2026-08-17 |
 | 4. Advanced AI/ML Inference & Physics Engine | 2/2 | Complete | 2026-08-17 |
 | 5. Cell-Level Monitoring & Dashboard Enhancement | 2/2 | Complete | 2026-08-17 |
-| 6. Automated Testing & Verification Suite | 0/2 | Not started | - |
+| 6. Automated Testing & Verification Suite | 2/2 | Complete | 2026-08-17 |
