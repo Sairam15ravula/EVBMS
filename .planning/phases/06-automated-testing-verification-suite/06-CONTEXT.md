@@ -6,30 +6,60 @@
 <domain>
 ## Phase Boundary
 
-This final phase establishes full test automation across backend microservices, ML model inference engines, physics Extended Kalman Filters, database persistence layers, React frontend components, and full end-to-end telemetry-to-ML system integration.
+This phase delivers an enterprise-grade, automated testing and verification suite across backend microservices, ML model inference engines, Extended Kalman Filters, database persistence layers, React frontend components, and full end-to-end telemetry-to-ML system pipeline verification with GitHub Actions CI automation.
 
 </domain>
 
 <decisions>
-## Implementation Decisions
+## 16 Explicit Testing & Verification Requirements
 
-### 1. Pytest Backend Suite (`tests/test_api.py`, `tests/test_models.py`, `tests/test_ekf.py`, `tests/test_db.py`) (TEST-01)
-- Unit tests for 1RC Extended Kalman Filter (`soc_ekf.py`): verify state vector convergence, NMC vs LFP OCV lookup tables, MAE < 1.5%, RMSE < 2.0%.
-- Unit tests for SHA256 Model Loader (`model_loader.py`): verify checksum validation, sidecar metadata parsing, and deterministic physical fallbacks when model binary is unready.
-- API integration tests for FastAPI REST routes (`/predict/soc-ekf`, `/api/auth/*`, `/api/vehicles/*`, `/api/telemetry/*`, `/api/alerts/*`).
-- Repository tests using SQLAlchemy async session mocks or test database.
+### 1. SoC Metric Reconciliation
+- Acceptance criteria: MAE <= 2.0% and RMSE <= 2.0% (preferred target MAE <= 1.5%), using Phase 4 1RC EKF validation methodology.
 
-### 2. Frontend Component & Integration Tests (`src/__tests__/`) (TEST-02)
-- Vitest / React Testing Library tests for `CellGridMonitor.tsx`, `Header.tsx`, `BmsComparison.tsx`, and `DigitalDoctorDrawer.tsx`.
-- WebSocket client service unit test (`telemetrySocket.ts`).
+### 2. Isolated Database for Integration Tests
+- Use isolated database connections for repository/database integration tests. Use mocks only for unit-level isolation.
 
-### 3. End-to-End System Verification Script (`scripts/verify_pipeline.py`) (TEST-03)
-- Standalone executable script that:
-  1. Checks backend `/api/health` aggregated status across FastAPI, Express, DB, and ML services.
-  2. Sends real-time telemetry frame to WebSocket gateway (`ws://localhost:3000/ws/telemetry`).
-  3. Verifies telemetry frame ingestion and database persistence via FastAPI history endpoint.
-  4. Triggers `POST /predict/soc-ekf` and validates EKF SoC response.
-  5. Asserts full pipeline execution passes cleanly with 0 errors.
+### 3. Accurate E2E Telemetry Pathway
+- E2E ingestion follows Phase 3 production architecture: `POST /api/telemetry` FastAPI endpoint ingests frames into TimescaleDB/PostgreSQL, and Express WebSocket gateway broadcasts frames to `/ws/telemetry`.
+
+### 4. Extended E2E Pipeline Scope
+- E2E pipeline tests SoC (EKF), SoH (XGBoost), RUL (XGBoost), Anomaly Detection (Isolation Forest + Physical Safety Rules), and XAI structured/fallback output.
+
+### 5. Offline Gemini Fallback Testing
+- Default automated test suite runs WITHOUT requiring `GEMINI_API_KEY`, exercising `xai_explainer.py` deterministic fallback. Live Gemini API tests are optional.
+
+### 6. Model-Quality Validation Tests
+- Add Pytest model quality tests validating metrics (SoH RMSE < 3.0%, RUL RMSE < 50 cycles, Anomaly F1/Precision) matching Phase 4 criteria.
+
+### 7. Leakage Prevention Verification
+- Verify that ML train/test splits occur strictly at the battery/cell level (`GroupKFold`) and zero telemetry rows leak between train and test packs.
+
+### 8. Model Loader Failure Case Matrix
+- Test `model_loader.py` failure cases: correct checksum, incorrect checksum, corrupted model binary, missing model, missing metadata JSON, invalid metadata JSON, and deterministic physics fallbacks.
+
+### 9. WebSocket Resilience Testing
+- Add tests for connection, disconnection, exponential backoff, reconnection, malformed JSON frames, missing fields, and server unavailability.
+
+### 10. Frontend Component Behavioral Tests
+- Add Vitest tests for `CellGridMonitor.tsx` (normal/imbalanced/critical states, voltage/thermal views, cell detail modal) and `telemetrySocket.ts` (live stream updates, disconnected state).
+
+### 11. Digital Doctor AI Tests
+- Add tests for `DigitalDoctorDrawer.tsx` covering anomaly-driven quick actions, conversation persistence across toggles, API error handling, and offline fallback behavior.
+
+### 12. Auth & RBAC Matrix Tests
+- Test authentication and RBAC endpoints covering unauthenticated (401), invalid JWT, expired JWT, viewer, operator, and admin access roles.
+
+### 13. GitHub Actions CI Pipeline Automation
+- Create `.github/workflows/ci.yml` running backend tests, frontend tests, ML validation, production builds, database integration tests, and E2E verification.
+
+### 14. CodeRabbit Review Compatibility
+- Ensure CI workflow and PR structure are compatible with CodeRabbit automated code review.
+
+### 15. Architecture Preservation & Conflict Checks
+- Zero architectural conflicts found across Phase 1-5 implementations. Preserve existing API contracts.
+
+### 16. Final Verification Report
+- Produce a final `VERIFICATION.md` report showing test counts, pass/fail status, ML metrics, EKF metrics, and E2E pipeline status.
 
 </decisions>
 
@@ -41,6 +71,7 @@ This final phase establishes full test automation across backend microservices, 
 - `backend/routes/` — FastAPI REST endpoints
 - `src/components/` — React UI components
 - `server.ts` — Express gateway server
+- `.github/workflows/ci.yml` — GitHub Actions CI pipeline
 
 </canonical_refs>
 
