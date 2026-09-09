@@ -1,10 +1,13 @@
-import express from 'express';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import { VEHICLE_PRESETS, SCENARIO_PRESETS, generateLiveTelemetryFrame, generateDegradationCurve } from './src/data/batteryData';
 import { calculateHealthMetrics } from './src/utils/analyticsEngine';
+import { telemetryWsManager } from './src/services/websocketServer';
 import { AIExplainResponse } from './src/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +18,16 @@ async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json());
+
+  // Express HTTP Rate Limiter Middleware (100 req per 15 min per IP)
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' },
+  });
+  app.use('/api/', apiLimiter);
 
   // Initialize Gemini API client lazily / safely
   let aiClient: GoogleGenAI | null = null;
@@ -27,19 +40,66 @@ async function startServer() {
           httpOptions: {
             headers: {
               'User-Agent': 'aistudio-build',
-            }
-          }
+            },
+          },
         });
       }
     }
     return aiClient;
   }
 
+  // Proxy FastAPI Application & ML Routes to Python Backend (http://127.0.0.1:8000)
+  const fastApiPrefixes = ['/predict', '/api/auth', '/api/vehicles', '/api/packs', '/api/alerts', '/api/telemetry/history'];
+  app.all(fastApiPrefixes.map(p => `${p}*`), async (req, res) => {
+    try {
+      const targetUrl = `http://127.0.0.1:8000${req.originalUrl}`;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (req.headers.authorization) {
+        headers['Authorization'] = req.headers.authorization;
+      }
+
+      const response = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (err: any) {
+      res.status(503).json({
+        error: 'FastAPI Backend offline or unreachable at http://127.0.0.1:8000',
+        note: 'Run `uvicorn backend.app:app --reload` to start the Python ML and Auth backend.',
+      });
+    }
+  });
+
+  // Gateway Aggregated Health Check Endpoint
+  app.get('/api/health', async (req, res) => {
+    let fastApiHealth: any = null;
+    try {
+      const resp = await fetch('http://127.0.0.1:8000/');
+      fastApiHealth = await resp.json();
+    } catch (e) {
+      fastApiHealth = { status: 'offline', note: 'FastAPI backend unreachable' };
+    }
+
+    const wsStats = telemetryWsManager.getStats();
+
+    res.json({
+      status: 'ok',
+      service: 'EV Battery Intelligence Express Gateway',
+      uptimeSeconds: process.uptime(),
+      timestamp: new Date().toISOString(),
+      websocketGateway: wsStats,
+      fastApiBackend: fastApiHealth,
+    });
+  });
+
   // API 1: Fetch Vehicle and Scenario Presets
   app.get('/api/presets', (req, res) => {
     res.json({
       vehicles: VEHICLE_PRESETS,
-      scenarios: SCENARIO_PRESETS
+      scenarios: SCENARIO_PRESETS,
     });
   });
 
@@ -59,7 +119,7 @@ async function startServer() {
       scenario,
       telemetry,
       healthMetrics,
-      degradationCurve
+      degradationCurve,
     });
   });
 
@@ -70,39 +130,38 @@ async function startServer() {
 
       const ai = getGeminiClient();
       if (!ai) {
-        // Fallback structured response if key is missing or placeholder
         const fallbackResponse: AIExplainResponse = {
           summary: `The ${vehicle?.name || 'EV Pack'} is operating at ${healthMetrics?.soh || 91}% State of Health with ${healthMetrics?.anomalies?.length || 0} active diagnostic flags. Major degradation drivers include elevated thermal cycles and high-current fast charging.`,
           degradationCauses: [
             {
               factor: 'SEI Layer Growth & Solid Electrolyte Interphase Thickening',
               impactPercentage: 45,
-              description: 'Continuous chemical breakdown at the graphite anode consuming active lithium ions during cycling.'
+              description: 'Continuous chemical breakdown at the graphite anode consuming active lithium ions during cycling.',
             },
             {
               factor: 'High C-Rate Thermal Stress from DC Fast Charging',
               impactPercentage: 35,
-              description: 'Fast charging currents (150kW+) generate internal ohmic heat (I²R) that breaks down cathode material structure.'
+              description: 'Fast charging currents (150kW+) generate internal ohmic heat (I²R) that breaks down cathode material structure.',
             },
             {
               factor: 'Sub-Zero Operation & Mechanical Micro-cracking',
               impactPercentage: 20,
-              description: 'Cold battery charge events create high internal impedance and localized lithium plating stress.'
-            }
+              description: 'Cold battery charge events create high internal impedance and localized lithium plating stress.',
+            },
           ],
           healthDiagnosis: `Battery is in ${healthMetrics?.healthStatusText || 'GOOD'} condition. Estimated remaining useful life is ${healthMetrics?.rulYears || 6.2} years (${healthMetrics?.rulCycles || 980} cycles) before reaching the 80% EOL boundary.`,
           riskAssessment: {
             level: healthMetrics?.riskLevel || 'LOW',
             thermalRunawayRisk: telemetry?.temperature > 45 ? 'Elevated due to recent thermal peak' : 'Low under current passive cooling profile',
             lithiumPlatingRisk: telemetry?.temperature < 5 ? 'High during fast charging' : 'Minimal at standard operating temperatures',
-            cellDegradationRisk: 'Moderate degradation rate consistent with NASA B0005 benchmark'
+            cellDegradationRisk: 'Moderate degradation rate consistent with NASA B0005 benchmark',
           },
           actionPlan: [
             'Maintain daily State of Charge (SoC) between 20% and 80% to minimize mechanical lattice stress.',
             'Activate battery pre-conditioning 15 minutes before plugging into DC Fast Chargers in winter.',
-            'Allow 10-minute thermal soak/cooling period after long high-speed highway trips prior to high-power fast charging.'
+            'Allow 10-minute thermal soak/cooling period after long high-speed highway trips prior to high-power fast charging.',
           ],
-          estimatedRemainingYears: healthMetrics?.rulYears || 6.2
+          estimatedRemainingYears: healthMetrics?.rulYears || 6.2,
         };
         return res.json({ success: true, aiAnalysis: fallbackResponse, source: 'simulated_fallback' });
       }
@@ -148,10 +207,10 @@ Generate a structured XAI (Explainable AI) diagnosis JSON answering:
                   properties: {
                     factor: { type: Type.STRING },
                     impactPercentage: { type: Type.NUMBER },
-                    description: { type: Type.STRING }
+                    description: { type: Type.STRING },
                   },
-                  required: ['factor', 'impactPercentage', 'description']
-                }
+                  required: ['factor', 'impactPercentage', 'description'],
+                },
               },
               healthDiagnosis: { type: Type.STRING },
               riskAssessment: {
@@ -160,24 +219,23 @@ Generate a structured XAI (Explainable AI) diagnosis JSON answering:
                   level: { type: Type.STRING },
                   thermalRunawayRisk: { type: Type.STRING },
                   lithiumPlatingRisk: { type: Type.STRING },
-                  cellDegradationRisk: { type: Type.STRING }
+                  cellDegradationRisk: { type: Type.STRING },
                 },
-                required: ['level', 'thermalRunawayRisk', 'lithiumPlatingRisk', 'cellDegradationRisk']
+                required: ['level', 'thermalRunawayRisk', 'lithiumPlatingRisk', 'cellDegradationRisk'],
               },
               actionPlan: {
                 type: Type.ARRAY,
-                items: { type: Type.STRING }
+                items: { type: Type.STRING },
               },
-              estimatedRemainingYears: { type: Type.NUMBER }
+              estimatedRemainingYears: { type: Type.NUMBER },
             },
-            required: ['summary', 'degradationCauses', 'healthDiagnosis', 'riskAssessment', 'actionPlan', 'estimatedRemainingYears']
-          }
-        }
+            required: ['summary', 'degradationCauses', 'healthDiagnosis', 'riskAssessment', 'actionPlan', 'estimatedRemainingYears'],
+          },
+        },
       });
 
       const parsedAnalysis: AIExplainResponse = JSON.parse(geminiResponse.text || '{}');
       res.json({ success: true, aiAnalysis: parsedAnalysis, source: 'gemini-3.6-flash' });
-
     } catch (error: any) {
       console.error('Error generating AI explanation:', error);
       res.status(500).json({ error: 'Failed to generate AI analysis', details: error.message });
@@ -196,7 +254,14 @@ To extend battery life:
 1. Avoid keeping your pack above 80% SoC for long idle periods.
 2. Limit DC Fast Charging in temperatures above 38°C or below 0°C.
 3. Precondition your battery in cold weather before fast charging.`;
-        return res.json({ reply: defaultReply, suggestedActions: ['How to precondition battery in winter?', 'Explain internal resistance growth', 'Can I charge to 100% for long road trips?'] });
+        return res.json({
+          reply: defaultReply,
+          suggestedActions: [
+            'How to precondition battery in winter?',
+            'Explain internal resistance growth',
+            'Can I charge to 100% for long road trips?',
+          ],
+        });
       }
 
       const systemPrompt = `You are the "Digital Doctor", an elite AI EV Battery Diagnostic Assistant powered by NASA/CALCE battery aging analytics.
@@ -215,8 +280,8 @@ Provide authoritative, concise, easy-to-understand diagnostic answers to the use
         model: 'gemini-3.6-flash',
         contents: userQuery,
         config: {
-          systemInstruction: systemPrompt
-        }
+          systemInstruction: systemPrompt,
+        },
       });
 
       res.json({
@@ -224,10 +289,9 @@ Provide authoritative, concise, easy-to-understand diagnostic answers to the use
         suggestedActions: [
           'What causes battery internal resistance to spike?',
           'Is DC fast charging safe for high mileage packs?',
-          'How does winter sub-zero driving affect my range?'
-        ]
+          'How does winter sub-zero driving affect my range?',
+        ],
       });
-
     } catch (error: any) {
       console.error('Chat error:', error);
       res.status(500).json({ error: 'Chat service failure', details: error.message });
@@ -238,7 +302,7 @@ Provide authoritative, concise, easy-to-understand diagnostic answers to the use
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa'
+      appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
@@ -249,8 +313,13 @@ Provide authoritative, concise, easy-to-understand diagnostic answers to the use
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`Battery Intelligence Platform server listening on http://localhost:${PORT}`);
+  // Create HTTP server and initialize WebSocket Gateway
+  const server = http.createServer(app);
+  telemetryWsManager.initialize(server, '/ws/telemetry');
+
+  server.listen(PORT, () => {
+    console.log(`Battery Intelligence Platform Gateway running on http://localhost:${PORT}`);
+    console.log(`WebSocket Telemetry Gateway listening on ws://localhost:${PORT}/ws/telemetry`);
   });
 }
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import EvBmsPlatform from './EvBmsPlatform';
 import { EVVehiclePreset, ScenarioPreset, BatteryTelemetry, HealthMetrics, DegradationPoint, AIExplainResponse, BatteryAnomaly } from './types';
 import { Header } from './components/Header';
 import { MetricCards } from './components/MetricCards';
@@ -9,27 +10,27 @@ import { AlertFeed } from './components/AlertFeed';
 import { XaiAnalysisCard } from './components/XaiAnalysisCard';
 import { SmartRecommendations } from './components/SmartRecommendations';
 import { DigitalDoctorDrawer } from './components/DigitalDoctorDrawer';
+import { LoginModal } from './components/LoginModal';
+import { AuthProvider } from './context/AuthContext';
 import { VEHICLE_PRESETS, SCENARIO_PRESETS, generateLiveTelemetryFrame, generateDegradationCurve } from './data/batteryData';
 import { calculateHealthMetrics } from './utils/analyticsEngine';
 
-export default function App() {
-  // Presets & Selection
+function MainApp() {
+  const [viewMode, setViewMode] = useState<'platform' | 'lab'>('platform');
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+
+  // Simulation State for Lab View
   const [vehicles] = useState<EVVehiclePreset[]>(VEHICLE_PRESETS);
   const [scenarios] = useState<ScenarioPreset[]>(SCENARIO_PRESETS);
-
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(VEHICLE_PRESETS[0].id);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>(SCENARIO_PRESETS[0].id);
-
-  // Simulation State
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [timeStep, setTimeStep] = useState<number>(0);
 
-  // Active Vehicle & Scenario
   const currentVehicle = vehicles.find(v => v.id === selectedVehicleId) || vehicles[0];
   const currentScenario = scenarios.find(s => s.id === selectedScenarioId) || scenarios[0];
 
-  // Telemetry & Health Data State
   const [telemetry, setTelemetry] = useState<BatteryTelemetry>(() =>
     generateLiveTelemetryFrame(currentVehicle, currentScenario, 0)
   );
@@ -39,19 +40,40 @@ export default function App() {
   const [degradationCurve, setDegradationCurve] = useState<DegradationPoint[]>(() =>
     generateDegradationCurve(currentScenario.soh, currentScenario.initialCycle, currentVehicle.chemistry as 'NMC' | 'LFP')
   );
-
-  // Sliding telemetry history buffer for charts
   const [telemetryHistory, setTelemetryHistory] = useState<BatteryTelemetry[]>([telemetry]);
-
-  // XAI & Digital Doctor State
   const [aiAnalysis, setAiAnalysis] = useState<AIExplainResponse | null>(null);
   const [isXaiLoading, setIsXaiLoading] = useState<boolean>(false);
-
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
   const [initialDoctorPrompt, setInitialDoctorPrompt] = useState<string>('');
 
-  // Update telemetry when vehicle or scenario changes
-  useEffect(() => {
+  // Fetch XAI analysis from Express server
+  const fetchXaiAnalysis = React.useCallback(async () => {
+    setIsXaiLoading(true);
+    try {
+      const res = await fetch('/api/explain-degradation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle: currentVehicle,
+          scenario: currentScenario,
+          telemetry,
+          healthMetrics
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.aiAnalysis) {
+        setAiAnalysis(data.aiAnalysis);
+      }
+    } catch (err) {
+      console.error('Failed to fetch XAI analysis:', err);
+    } finally {
+      setIsXaiLoading(false);
+    }
+  }, [currentVehicle, currentScenario, telemetry, healthMetrics]);
+
+  // Reset telemetry on vehicle / scenario / viewMode change
+  React.useEffect(() => {
+    if (viewMode !== 'lab') return;
     setTimeStep(0);
     const initialFrame = generateLiveTelemetryFrame(currentVehicle, currentScenario, 0);
     const initialHealth = calculateHealthMetrics(initialFrame, currentVehicle);
@@ -62,28 +84,25 @@ export default function App() {
     setDegradationCurve(initialDeg);
     setTelemetryHistory([initialFrame]);
 
-    // Automatically trigger Gemini XAI explanation on scenario change
-    fetchXaiExplanation(currentVehicle, currentScenario, initialFrame, initialHealth);
-  }, [selectedVehicleId, selectedScenarioId]);
+    fetchXaiAnalysis();
+  }, [selectedVehicleId, selectedScenarioId, viewMode]);
 
-  // Live simulation tick interval
-  useEffect(() => {
-    if (!isSimulating) return;
+  // Simulation interval loop for Lab view
+  React.useEffect(() => {
+    if (viewMode !== 'lab' || !isSimulating) return;
 
-    const intervalMs = 1500 / simSpeed;
+    const intervalMs = Math.max(200, 1500 / simSpeed);
     const timer = setInterval(() => {
-      setTimeStep(prev => {
-        const nextStep = prev + 1;
-        const newFrame = generateLiveTelemetryFrame(currentVehicle, currentScenario, nextStep);
-        const newHealth = calculateHealthMetrics(newFrame, currentVehicle);
+      setTimeStep((prevStep) => {
+        const nextStep = prevStep + 1;
+        const nextFrame = generateLiveTelemetryFrame(currentVehicle, currentScenario, nextStep);
+        const nextHealth = calculateHealthMetrics(nextFrame, currentVehicle);
 
-        setTelemetry(newFrame);
-        setHealthMetrics(newHealth);
-
-        setTelemetryHistory(hist => {
-          const updated = [...hist, newFrame];
-          if (updated.length > 25) updated.shift();
-          return updated;
+        setTelemetry(nextFrame);
+        setHealthMetrics(nextHealth);
+        setTelemetryHistory((prevHistory) => {
+          const updated = [...prevHistory, nextFrame];
+          return updated.length > 30 ? updated.slice(updated.length - 30) : updated;
         });
 
         return nextStep;
@@ -91,49 +110,75 @@ export default function App() {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [isSimulating, simSpeed, currentVehicle, currentScenario]);
+  }, [viewMode, isSimulating, simSpeed, currentVehicle, currentScenario]);
 
-  // Fetch XAI Explanation from Express backend (/api/explain-degradation)
-  const fetchXaiExplanation = async (
-    v = currentVehicle,
-    s = currentScenario,
-    t = telemetry,
-    h = healthMetrics
-  ) => {
-    setIsXaiLoading(true);
-    try {
-      const response = await fetch('/api/explain-degradation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vehicle: v,
-          scenario: s,
-          telemetry: t,
-          healthMetrics: h
-        })
-      });
-
-      const data = await response.json();
-      if (data.aiAnalysis) {
-        setAiAnalysis(data.aiAnalysis);
-      }
-    } catch (err) {
-      console.error('Failed to fetch XAI explanation:', err);
-    } finally {
-      setIsXaiLoading(false);
-    }
+  const handleResetSimulation = () => {
+    setTimeStep(0);
+    const initialFrame = generateLiveTelemetryFrame(currentVehicle, currentScenario, 0);
+    const initialHealth = calculateHealthMetrics(initialFrame, currentVehicle);
+    setTelemetry(initialFrame);
+    setHealthMetrics(initialHealth);
+    setTelemetryHistory([initialFrame]);
   };
 
-  // Open Chatbot Doctor with specific prompt
-  const handleAskDoctorAboutAnomaly = (anomaly: BatteryAnomaly) => {
-    setInitialDoctorPrompt(`Please explain this anomaly flag: "${anomaly.title}". Value was ${anomaly.value} (threshold: ${anomaly.threshold}). What is the root cause and immediate recommended action?`);
-    setIsDoctorOpen(true);
-  };
+  if (viewMode === 'platform') {
+    return (
+      <div className="relative">
+        <div className="fixed top-3 right-4 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs">
+          <span className="text-slate-400 font-mono">View:</span>
+          <button
+            onClick={() => setViewMode('platform')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              viewMode === 'platform'
+                ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            EVBMS Platform
+          </button>
+          <button
+            onClick={() => setViewMode('lab')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              viewMode === 'lab'
+                ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Telemetry Lab
+          </button>
+        </div>
+        <EvBmsPlatform />
+        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-slate-950 pb-12">
-      
-      {/* Platform Navigation Header */}
+      <div className="fixed top-3 right-4 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs">
+        <span className="text-slate-400 font-mono">View:</span>
+        <button
+          onClick={() => setViewMode('platform')}
+          className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+            viewMode === 'platform'
+              ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          EVBMS Platform
+        </button>
+        <button
+          onClick={() => setViewMode('lab')}
+          className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+            viewMode === 'lab'
+              ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Telemetry Lab
+        </button>
+      </div>
+
       <Header
         vehicles={vehicles}
         scenarios={scenarios}
@@ -145,17 +190,15 @@ export default function App() {
         onSelectScenario={setSelectedScenarioId}
         onToggleSimulation={() => setIsSimulating(!isSimulating)}
         onChangeSpeed={setSimSpeed}
-        onResetSimulation={() => setTimeStep(0)}
+        onResetSimulation={handleResetSimulation}
         onOpenDoctor={() => {
           setInitialDoctorPrompt('');
           setIsDoctorOpen(true);
         }}
+        onOpenLoginModal={() => setIsLoginModalOpen(true)}
       />
 
-      {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 pt-6 space-y-6">
-        
-        {/* Scenario Banner Overview */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 font-mono">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -177,20 +220,17 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. Core Battery Metric Cards */}
         <MetricCards
           telemetry={telemetry}
           healthMetrics={healthMetrics}
           vehicle={currentVehicle}
         />
 
-        {/* 2. Real-Time Telemetry Stream & Capacity Degradation Curve */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TelemetryChart
             history={telemetryHistory}
             currentTelemetry={telemetry}
           />
-
           <DegradationChart
             degradationData={degradationCurve}
             currentCycle={telemetry.cycleCount}
@@ -198,53 +238,57 @@ export default function App() {
           />
         </div>
 
-        {/* 3. Explainable AI (XAI) Gemini Analysis */}
         <XaiAnalysisCard
-          analysis={aiAnalysis}
+          aiAnalysis={aiAnalysis}
           isLoading={isXaiLoading}
-          onRefreshXai={() => fetchXaiExplanation()}
-          onOpenDoctor={() => {
-            setInitialDoctorPrompt('');
-            setIsDoctorOpen(true);
-          }}
+          onRefresh={fetchXaiAnalysis}
         />
 
-        {/* 4. BMS Comparison Module */}
-        <BmsComparison
-          telemetry={telemetry}
-          healthMetrics={healthMetrics}
-        />
-
-        {/* 5. Alerts Feed & Smart Operational Recommendations */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AlertFeed
-            anomalies={healthMetrics.anomalies}
-            onAskDoctorAboutAnomaly={handleAskDoctorAboutAnomaly}
-          />
-
-          <SmartRecommendations
-            telemetry={telemetry}
-            healthMetrics={healthMetrics}
-            vehicle={currentVehicle}
-            onOpenDoctor={() => {
-              setInitialDoctorPrompt('');
-              setIsDoctorOpen(true);
-            }}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <AlertFeed
+              anomalies={healthMetrics.anomalies}
+              onAskDoctor={handleAskDoctorAboutAnomaly}
+            />
+          </div>
+          <div>
+            <SmartRecommendations
+              recommendations={healthMetrics.recommendations}
+            />
+          </div>
         </div>
 
+        <BmsComparison
+          vehicle={currentVehicle}
+          healthMetrics={healthMetrics}
+        />
       </main>
 
-      {/* Floating Digital Doctor AI Assistant Drawer */}
       <DigitalDoctorDrawer
         isOpen={isDoctorOpen}
         onClose={() => setIsDoctorOpen(false)}
-        vehicle={currentVehicle}
-        telemetry={telemetry}
-        healthMetrics={healthMetrics}
+        context={{
+          vehicle: currentVehicle,
+          telemetry,
+          healthMetrics
+        }}
         initialPrompt={initialDoctorPrompt}
       />
 
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
+  );
+
+  function handleAskDoctorAboutAnomaly(anomaly: BatteryAnomaly) {
+    setInitialDoctorPrompt(`Please explain this anomaly flag: "${anomaly.title}". Value was ${anomaly.value} (threshold: ${anomaly.threshold}). What is the root cause and immediate recommended action?`);
+    setIsDoctorOpen(true);
+  }
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }

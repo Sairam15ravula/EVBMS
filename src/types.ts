@@ -2,6 +2,25 @@
  * EV Battery Intelligence Platform Types
  */
 
+export type UserRole = 'admin' | 'fleet_manager' | 'technician' | 'driver';
+
+export interface User {
+  id: string;
+  email: string;
+  fullName?: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  role: UserRole | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
 export interface BatteryTelemetry {
   timestamp: string;
   voltage: number;         // V (e.g., 340.0 - 415.0)

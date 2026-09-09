@@ -5,3 +5,9 @@ numpy
 pandas
 scikit-learn
 xgboost
+sqlalchemy>=2.0.28
+asyncpg>=0.29.0
+alembic>=1.13.1
+psycopg2-binary>=2.9.9
+pyjwt>=2.8.0
+passlib[bcrypt]>=1.7.4

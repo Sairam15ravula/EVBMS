@@ -1,0 +1,17 @@
+{
+  "model_name": "telemetry_isolation_forest",
+  "version": "1.0.0",
+  "algorithm": "IsolationForest",
+  "dataset": "NASA_B0005_CALCE",
+  "feature_schema_version": "v1.0",
+  "features": [
+    "soc",
+    "voltage",
+    "current"
+  ],
+  "training_timestamp": "2026-08-17T14:45:11.400091+00:00",
+  "validation_metrics": {
+    "contamination": 0.01
+  },
+  "sha256": "5a5f0e123001caae8f4e76a1faf9d4dfac3960b677bbbc202e9f8bc00b1f3c8e"
+}

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { HealthMetrics, BatteryTelemetry } from '../types';
+import React, { useState, useEffect } from 'react';
+import { HealthMetrics, BatteryTelemetry, EVVehiclePreset } from '../types';
 import { CheckCircle2, AlertTriangle, Cpu, Zap, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
+import { VEHICLE_PRESETS } from '../data/batteryData';
 
 interface BmsComparisonProps {
   telemetry: BatteryTelemetry;
@@ -12,23 +13,45 @@ export const BmsComparison: React.FC<BmsComparisonProps> = ({
   healthMetrics
 }) => {
   const [activeTab, setActiveTab] = useState<'SIDE_BY_SIDE' | 'AI_ADVANTAGE'>('SIDE_BY_SIDE');
+  const [vehicles, setVehicles] = useState<EVVehiclePreset[]>(VEHICLE_PRESETS);
+  const [v1, setV1] = useState<EVVehiclePreset>(VEHICLE_PRESETS[0]);
+  const [v2, setV2] = useState<EVVehiclePreset>(VEHICLE_PRESETS[3]); // LFP preset
+
+  useEffect(() => {
+    async function loadApiVehicles() {
+      try {
+        const res = await fetch('/api/vehicles');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length >= 2) {
+            setVehicles(data);
+            setV1(data[0]);
+            setV2(data[1]);
+          }
+        }
+      } catch (e) {
+        // Smooth fallback to local presets
+      }
+    }
+    loadApiVehicles();
+  }, []);
 
   return (
     <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
       
-      {/* Title & Toggle */}
+      {/* Title & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 text-[10px] font-mono font-semibold uppercase">
-              Architecture Shift
+              Architecture & Fleet Comparison
             </span>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-              Traditional BMS vs AI Battery Intelligence Platform
+              Multi-Vehicle Battery Analytics
             </h2>
           </div>
           <p className="text-xs text-slate-400">
-            Shifting from reactive threshold monitoring to predictive, explainable intelligence
+            Side-by-side battery chemistry & physics comparison backed by backend API telemetry.
           </p>
         </div>
 
@@ -41,7 +64,7 @@ export const BmsComparison: React.FC<BmsComparisonProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Side-by-Side View
+            Side-by-Side
           </button>
           <button
             onClick={() => setActiveTab('AI_ADVANTAGE')}
@@ -59,94 +82,100 @@ export const BmsComparison: React.FC<BmsComparisonProps> = ({
       {activeTab === 'SIDE_BY_SIDE' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* Traditional BMS Box */}
+          {/* Vehicle 1 Card */}
           <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
-                <span className="text-xs font-bold text-slate-300 font-mono uppercase flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  Traditional Legacy BMS
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-900 text-slate-400 rounded">
-                  Reactive Mode
+                <select
+                  value={v1.id}
+                  onChange={(e) => {
+                    const found = vehicles.find(v => v.id === e.target.value);
+                    if (found) setV1(found);
+                  }}
+                  className="bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-xs rounded px-2 py-1 font-mono outline-none"
+                >
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.chemistry})</option>
+                  ))}
+                </select>
+                <span className="text-[10px] font-mono px-2 py-0.5 bg-cyan-950 text-cyan-300 rounded border border-cyan-800">
+                  {v1.chemistry} Pack
                 </span>
               </div>
 
-              <ul className="space-y-3 text-xs text-slate-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-0.5">•</span>
-                  <div>
-                    <strong className="text-slate-200 block font-mono">Raw Threshold Alarms:</strong>
-                    Triggers warning ONLY when temperature exceeds 45°C or voltage drops below cutoff.
-                  </div>
+              <ul className="space-y-3 text-xs text-slate-300 font-mono">
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Total Energy:</span>
+                  <span className="text-white font-bold">{v1.totalEnergyKwh} kWh</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-0.5">•</span>
-                  <div>
-                    <strong className="text-slate-200 block font-mono">Oversimplified Linear SoH:</strong>
-                    Calculates SoH via simple Coulomb counting, ignoring C-rate, temperature stress, or internal resistance growth.
-                  </div>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Nominal Voltage:</span>
+                  <span className="text-white font-bold">{v1.nominalVoltageV} V</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-0.5">•</span>
-                  <div>
-                    <strong className="text-slate-200 block font-mono">Zero Root-Cause Diagnostics:</strong>
-                    Shows static error code (e.g. "P0A7F") without explaining why the cell degraded.
-                  </div>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Baseline Resistance:</span>
+                  <span className="text-white font-bold">{v1.baselineResistanceMilliOhm} mΩ</span>
+                </li>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Max DC Fast Charge:</span>
+                  <span className="text-emerald-400 font-bold">{v1.maxChargingKw} kW</span>
                 </li>
               </ul>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-800/60 bg-slate-900/50 p-2.5 rounded-lg text-[11px] font-mono text-slate-400">
-              <span className="text-slate-400 block mb-1 uppercase">Traditional BMS Output:</span>
-              <p className="text-slate-300">
-                "SoH: {healthMetrics.soh}% | Status: OK | Temp: {telemetry.temperature}°C"
+            <div className="mt-4 pt-3 border-t border-slate-800/60 bg-slate-900/50 p-2.5 rounded-lg text-[11px] font-mono text-slate-300">
+              <span className="text-slate-400 block mb-1 uppercase">Architecture Profile:</span>
+              <p className="text-slate-300 text-[11px]">
+                {v1.description}
               </p>
             </div>
           </div>
 
-          {/* AI Battery Intelligence Platform Box */}
+          {/* Vehicle 2 Card */}
           <div className="bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950/40 border border-cyan-500/30 rounded-xl p-4 flex flex-col justify-between shadow-lg shadow-cyan-950/20">
             <div>
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-cyan-800/40">
-                <span className="text-xs font-bold text-cyan-300 font-mono uppercase flex items-center gap-1.5">
-                  <Cpu className="w-4 h-4 text-cyan-400 animate-pulse" />
-                  Our Battery Intelligence Platform
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 bg-cyan-950 text-cyan-300 rounded border border-cyan-800/60">
-                  Predictive & XAI
+                <select
+                  value={v2.id}
+                  onChange={(e) => {
+                    const found = vehicles.find(v => v.id === e.target.value);
+                    if (found) setV2(found);
+                  }}
+                  className="bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-xs rounded px-2 py-1 font-mono outline-none"
+                >
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.chemistry})</option>
+                  ))}
+                </select>
+                <span className="text-[10px] font-mono px-2 py-0.5 bg-indigo-950 text-indigo-300 rounded border border-indigo-800">
+                  {v2.chemistry} Pack
                 </span>
               </div>
 
-              <ul className="space-y-3 text-xs text-slate-300">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white block font-mono">Predictive Anomaly Shield:</strong>
-                    Detects early thermal runaway risk & sub-zero lithium plating hours before physical damage occurs.
-                  </div>
+              <ul className="space-y-3 text-xs text-slate-300 font-mono">
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Total Energy:</span>
+                  <span className="text-white font-bold">{v2.totalEnergyKwh} kWh</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white block font-mono">NASA / CALCE Non-Linear RUL:</strong>
-                    Accurately models non-linear capacity knees and provides precise cycle & year RUL estimates.
-                  </div>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Nominal Voltage:</span>
+                  <span className="text-white font-bold">{v2.nominalVoltageV} V</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white block font-mono">Gemini "Digital Doctor" XAI:</strong>
-                    Provides plain-language root cause explanations (SEI buildup, fast charging heat) + 3-step life-extension plan.
-                  </div>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Baseline Resistance:</span>
+                  <span className="text-white font-bold">{v2.baselineResistanceMilliOhm} mΩ</span>
+                </li>
+                <li className="flex justify-between py-1 border-b border-slate-800/40">
+                  <span className="text-slate-400">Max DC Fast Charge:</span>
+                  <span className="text-emerald-400 font-bold">{v2.maxChargingKw} kW</span>
                 </li>
               </ul>
             </div>
 
             <div className="mt-4 pt-3 border-t border-cyan-800/40 bg-slate-900/80 p-2.5 rounded-lg text-[11px] font-mono text-cyan-300">
-              <span className="text-cyan-400 block mb-1 uppercase font-bold">AI Platform Predictive Output:</span>
-              <p className="text-slate-200">
-                "SoH: {healthMetrics.soh}% | RUL: {healthMetrics.rulYears} yrs ({healthMetrics.rulCycles} cyc) | Risk: {healthMetrics.riskLevel} | Action: Limit DCFC in hot temps"
+              <span className="text-cyan-400 block mb-1 uppercase font-bold">Architecture Profile:</span>
+              <p className="text-slate-200 text-[11px]">
+                {v2.description}
               </p>
             </div>
           </div>

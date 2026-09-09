@@ -8,8 +8,8 @@
       "capacity",
       "init_capacity"
     ],
-    "mae": 0.0027163276088804193,
-    "r2": 0.9990705235132581
+    "mae": 0.0065704444232398875,
+    "r2": 0.9929529312251181
   },
   "RUL_model": {
     "type": "XGBRegressor",
@@ -21,36 +21,44 @@
       "soh",
       "init_capacity"
     ],
-    "mae": 1.1021853685379028,
-    "r2": 0.9988040924072266
+    "mae": 2.4364824295043945,
+    "r2": 0.9899806976318359
   },
   "Charging_class_model": {
     "type": "XGBClassifier",
     "features": [
-      "SOC (%)",
-      "Voltage (V)",
-      "Current (A)",
-      "Battery Temp (\u00b0C)",
-      "Ambient Temp (\u00b0C)",
-      "Charging Duration (min)",
-      "Degradation Rate (%)",
-      "Charging Mode",
-      "Efficiency (%)",
-      "Battery Type",
-      "Charging Cycles",
-      "EV Model"
+      "SOC",
+      "Voltage",
+      "Current",
+      "Battery_Temp",
+      "Ambient_Temp",
+      "Charging_Duration",
+      "Degradation_Rate",
+      "Charging_Mode",
+      "Efficiency",
+      "Battery_Type",
+      "Charging_Cycles",
+      "EV_Model"
     ],
     "accuracy": 1.0,
     "f1_macro": 1.0
   },
   "Telemetry_anomaly_model": {
-    "type": "IsolationForest+StandardScaler",
+    "type": "XGBClassifier+StandardScaler",
     "features": [
       "soc",
       "voltage",
       "current",
       "hour",
       "dayofweek"
+    ]
+  },
+  "Telemetry_isolation_forest": {
+    "type": "IsolationForest+StandardScaler",
+    "features": [
+      "soc",
+      "voltage",
+      "current"
     ],
     "contamination": 0.01
   },
@@ -59,13 +67,13 @@
     "features": [
       "Cycle_Index"
     ],
-    "mae": 0.007108281874578332,
-    "r2": 0.4951704080558661
+    "mae": 0.008961093700372407,
+    "r2": 0.3672215692036678
   },
   "Notes": [
-    "Models were retrained from the CSV files in the datasets folder.",
-    "SOH and RUL use cycle-level battery data.",
-    "Charging class uses the EV charging dataset with categorical encoding.",
-    "Telemetry anomaly uses the telemetry time-series sample and unsupervised anomaly detection."
+    "Models were retrained from CSV files with proper 80/20 train/test evaluation split.",
+    "SOH and RUL models evaluated on out-of-sample test sets.",
+    "Charging class uses categorical encodings with pipeline persistence.",
+    "Telemetry anomaly models combine supervised XGBClassifier with unsupervised Isolation Forest."
   ]
 }

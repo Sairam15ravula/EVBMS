@@ -1,0 +1,20 @@
+{
+  "model_name": "telemetry_anomaly_model",
+  "version": "1.0.0",
+  "algorithm": "XGBClassifier",
+  "dataset": "NASA_B0005_CALCE",
+  "feature_schema_version": "v1.0",
+  "features": [
+    "soc",
+    "voltage",
+    "current",
+    "hour",
+    "dayofweek"
+  ],
+  "training_timestamp": "2026-08-17T14:45:11.825371+00:00",
+  "validation_metrics": {
+    "accuracy": 0.9989524279023909,
+    "f1": 0.9467084639498433
+  },
+  "sha256": "4a52b89f0128b0a5a83034b1e24b754dbd3549940e43dc13f138a321dd143c26"
+}

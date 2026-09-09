@@ -1,6 +1,7 @@
 import React from 'react';
 import { EVVehiclePreset, ScenarioPreset } from '../types';
-import { Activity, Play, Pause, RefreshCw, Cpu, Zap, BatteryCharging, ShieldAlert } from 'lucide-react';
+import { Activity, Play, Pause, RefreshCw, Cpu, Zap, Shield, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   vehicles: EVVehiclePreset[];
@@ -15,6 +16,7 @@ interface HeaderProps {
   onChangeSpeed: (speed: number) => void;
   onResetSimulation: () => void;
   onOpenDoctor: () => void;
+  onOpenLoginModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,8 +31,10 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSimulation,
   onChangeSpeed,
   onResetSimulation,
-  onOpenDoctor
+  onOpenDoctor,
+  onOpenLoginModal,
 }) => {
+  const { user, isAuthenticated, logout } = useAuth();
   const currentVehicle = vehicles.find(v => v.id === selectedVehicleId) || vehicles[0];
   const currentScenario = scenarios.find(s => s.id === selectedScenarioId) || scenarios[0];
 
@@ -107,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          {/* Simulation Controls */}
+          {/* Simulation & Auth Controls */}
           <div className="flex items-center gap-1.5 pt-3 sm:pt-0">
             <button
               onClick={onToggleSimulation}
@@ -152,6 +156,32 @@ export const Header: React.FC<HeaderProps> = ({
               <Cpu className="w-3.5 h-3.5 text-indigo-200" />
               Digital Doctor AI
             </button>
+
+            {/* Auth User Status Pill / Sign In Button */}
+            {isAuthenticated && user ? (
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 border border-emerald-800/40 rounded-lg">
+                  <UserIcon className="w-3 h-3" />
+                  <span className="font-medium max-w-[100px] truncate">{user.fullName || user.email}</span>
+                  <span className="text-[9px] uppercase font-mono bg-emerald-900/80 px-1 py-0.2 rounded text-emerald-200">{user.role}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  title="Sign Out"
+                  className="p-1.5 bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-300 border border-slate-800 rounded-lg transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenLoginModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-semibold transition"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )}
           </div>
         </div>
 

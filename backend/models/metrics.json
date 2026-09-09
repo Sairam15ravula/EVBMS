@@ -1,9 +1,9 @@
 {
-  "model_count": 5,
+  "model_count": 6,
   "summary": [
-    "Models were retrained from the CSV files in the datasets folder.",
-    "SOH and RUL use cycle-level battery data.",
-    "Charging class uses the EV charging dataset with categorical encoding.",
-    "Telemetry anomaly uses the telemetry time-series sample and unsupervised anomaly detection."
+    "Models were retrained from CSV files with proper 80/20 train/test evaluation split.",
+    "SOH and RUL models evaluated on out-of-sample test sets.",
+    "Charging class uses categorical encodings with pipeline persistence.",
+    "Telemetry anomaly models combine supervised XGBClassifier with unsupervised Isolation Forest."
   ]
 }

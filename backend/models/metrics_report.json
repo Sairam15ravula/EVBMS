@@ -1,0 +1,93 @@
+{
+  "soh": {
+    "features": [
+      "cycle",
+      "voltage",
+      "temperature",
+      "capacity",
+      "init_capacity"
+    ],
+    "mae": 0.033,
+    "rmse": 0.075,
+    "r2": 0.9999
+  },
+  "rul": {
+    "features": [
+      "cycle",
+      "voltage",
+      "temperature",
+      "capacity",
+      "soh",
+      "init_capacity"
+    ],
+    "rows_used": 4080,
+    "mae_cycles": 13.2,
+    "rmse_cycles": 18.7,
+    "r2": 0.8588
+  },
+  "telemetry_anomaly": {
+    "features": [
+      "soc",
+      "voltage",
+      "current",
+      "hour",
+      "dayofweek"
+    ],
+    "positive_rate_in_data": 0.0163,
+    "accuracy": 0.9001,
+    "precision_at_0.5": 0.0443,
+    "recall_at_0.5": 0.25,
+    "f1_at_0.5": 0.0753,
+    "roc_auc": 0.6896,
+    "pr_auc": 0.0617,
+    "note": "Anomalies are rare (~1-2% of rows) and this endpoint's inputs are limited to soc/voltage/current/hour/dayofweek per the PRD spec \u2014 they don't include temperature or resistance, which is what actually drives the injected incidents in the synthetic data. Precision/recall at the default 0.5 threshold are weak as a result; ROC-AUC/PR-AUC are the more honest read on this model, and it's meant to complement the Isolation Forest below, not replace it. Worth revisiting this endpoint's feature list once real telemetry is available."
+  },
+  "telemetry_isolation_forest": {
+    "features": [
+      "voltage",
+      "current",
+      "temperature",
+      "resistance",
+      "soc"
+    ],
+    "contamination_param": 0.05,
+    "flagged_rate": 0.05,
+    "recall_vs_injected_incidents_sanity_check": 0.3167,
+    "note": "Unsupervised \u2014 trained without labels, as intended. The recall figure above is only possible here because the synthetic labels are known; treat it as a sanity check, not a real evaluation metric, once you're on real data."
+  },
+  "capacity_fade": {
+    "features": [
+      "Cycle_Index"
+    ],
+    "mae_kwh": 3.304,
+    "r2": 0.3123,
+    "note": "Single-feature population trend (cycle only) \u2014 much coarser than the SoH model on purpose, matching the PRD's minimal input spec for this endpoint."
+  },
+  "charging_class": {
+    "num_features": [
+      "SOC",
+      "Voltage",
+      "Current",
+      "Battery_Temp",
+      "Ambient_Temp",
+      "Charging_Duration",
+      "Degradation_Rate",
+      "Efficiency",
+      "Charging_Cycles"
+    ],
+    "cat_features": [
+      "Charging_Mode",
+      "Battery_Type",
+      "EV_Model"
+    ],
+    "classes": [
+      "aggressive_fast",
+      "fast_moderate",
+      "full_charge_wear",
+      "optimal",
+      "standard"
+    ],
+    "accuracy": 0.9925,
+    "f1_macro": 0.9934
+  }
+}

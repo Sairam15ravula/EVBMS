@@ -114,6 +114,37 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
 ];
 
 /**
+ * Generates synthetic cell voltage array supporting dynamic chemistry (NMC vs LFP) and configurable cell count.
+ */
+export function generateCellVoltages(
+  nominalPackVoltage: number,
+  cellCount: number = 96,
+  chemistry: 'NMC' | 'LFP' = 'NMC',
+  imbalanceMv: number = 15
+): { cellId: number; voltage: number; temp: number; resistance: number }[] {
+  const avgCellVoltage = chemistry === 'LFP' ? 3.25 : 3.85;
+  const baseTemp = 28.0;
+  const baseResistance = chemistry === 'LFP' ? 0.85 : 0.65; // mΩ per cell
+
+  const cells = [];
+  for (let i = 1; i <= cellCount; i++) {
+    // Add small realistic Gaussian-like variation per cell
+    const cellNoiseV = (Math.sin(i * 1.7) * 0.008) + ((Math.random() - 0.5) * (imbalanceMv / 1000.0));
+    const cellNoiseTemp = (Math.cos(i * 0.9) * 1.5) + (i % 7 === 0 ? 3.2 : 0.0); // Hotspot on module center
+    const cellNoiseRes = (Math.sin(i * 0.4) * 0.05);
+
+    cells.push({
+      cellId: i,
+      voltage: parseFloat(Math.max(2.4, Math.min(4.25, avgCellVoltage + cellNoiseV)).toFixed(3)),
+      temp: parseFloat((baseTemp + cellNoiseTemp).toFixed(1)),
+      resistance: parseFloat((baseResistance + cellNoiseRes).toFixed(3)),
+    });
+  }
+
+  return cells;
+}
+
+/**
  * Generates NASA Battery B0005/CALCE based degradation curve (Cycles 0 to 2000)
  */
 export function generateDegradationCurve(
@@ -125,25 +156,18 @@ export function generateDegradationCurve(
   const maxCycle = 2000;
   const step = 50;
 
-  // NASA B0005 Empirical parameters:
-  // Capacity Ah(n) = C0 * (1 - alpha * n^0.6 - beta * exp(gamma * n))
   const alpha = chemistry === 'LFP' ? 0.00015 : 0.00028;
   const beta = chemistry === 'LFP' ? 0.000005 : 0.000018;
   const gamma = 0.0028;
 
   for (let cycle = 0; cycle <= maxCycle; cycle += step) {
-    // Standard degradation physics model
     const degradationFraction = alpha * Math.pow(cycle, 0.6) + beta * Math.exp(gamma * (cycle / 100));
     const aiPredictedSoH = Math.max(60, Math.min(100, 100 - degradationFraction * 100));
-
-    // Linear projection (Traditional BMS oversimplification)
     const traditionalLinearSoH = Math.max(50, 100 - (cycle * 0.0125));
-
     const isFuture = cycle > currentCycle;
 
     let actualCapPct: number | undefined = undefined;
     if (!isFuture) {
-      // Add small realistic noise to historic points mirroring CALCE laboratory impedance measurements
       const noise = (Math.sin(cycle * 0.1) * 0.3) + (Math.cos(cycle * 0.05) * 0.2);
       actualCapPct = Math.max(65, Math.min(100, aiPredictedSoH + noise));
     }
@@ -179,41 +203,33 @@ export function generateLiveTelemetryFrame(
                    scenario.tempProfile === 'HOT_DESERT' ? 38 :
                    scenario.tempProfile === 'THERMAL_SPIKE' ? 48 : 25;
 
-  // Cycle phase (e.g. driving discharge vs regenerative braking vs DCFC)
   const phase = Math.floor(timeOffsetSec / 15) % 4; 
   let currentA = 0;
   let socDelta = 0;
 
   if (phase === 0) {
-    // Highway Cruising
     currentA = -65.0 - Math.sin(timeOffsetSec * 0.5) * 15;
     socDelta = -0.05;
   } else if (phase === 1) {
-    // Hard Acceleration
     currentA = -180.0 - Math.cos(timeOffsetSec * 0.8) * 45;
     socDelta = -0.12;
   } else if (phase === 2) {
-    // Regenerative Braking
     currentA = 85.0 + Math.sin(timeOffsetSec * 0.4) * 25;
     socDelta = +0.06;
   } else {
-    // Rapid DC Fast Charging
     currentA = 165.0 + Math.sin(timeOffsetSec * 0.2) * 10;
     socDelta = +0.18;
   }
 
-  // Calculate SoC %
   let soc = Math.max(5, Math.min(98, 72.0 + Math.sin(timeOffsetSec * 0.05) * 8.0 + (timeOffsetSec % 60) * socDelta * 0.1));
   soc = parseFloat(soc.toFixed(1));
 
-  // Voltage dynamics: V = V_oc(SoC) - I * R_int
   const openCircuitVoltage = preset.nominalVoltageV * (0.88 + 0.15 * (soc / 100));
   const rInternal = preset.baselineResistanceMilliOhm * (1 + (100 - scenario.soh) * 0.02) * (scenario.tempProfile === 'SUB_ZERO' ? 1.8 : 1.0);
   const voltageDrop = (currentA * (rInternal / 1000));
   let voltage = openCircuitVoltage + voltageDrop;
   voltage = parseFloat(voltage.toFixed(1));
 
-  // Temperature dynamics with Joule heating (I^2 * R)
   const jouleHeatFactor = (Math.pow(currentA / 100, 2) * (rInternal / 10)) * 0.05;
   let temp = baseTemp + (timeOffsetSec * 0.08) + jouleHeatFactor;
   if (scenario.tempProfile === 'THERMAL_SPIKE') {
@@ -221,9 +237,7 @@ export function generateLiveTelemetryFrame(
   }
   temp = parseFloat(temp.toFixed(1));
 
-  // Current Capacity
   const currentCapAh = preset.nominalCapacityAh * (scenario.soh / 100);
-
   const powerKw = parseFloat(((voltage * Math.abs(currentA)) / 1000).toFixed(1));
 
   return {

@@ -1,0 +1,27 @@
+{
+  "model_name": "charging_class_model_xgb",
+  "version": "1.0.0",
+  "algorithm": "XGBClassifier",
+  "dataset": "NASA_B0005_CALCE",
+  "feature_schema_version": "v1.0",
+  "features": [
+    "SOC",
+    "Voltage",
+    "Current",
+    "Battery_Temp",
+    "Ambient_Temp",
+    "Charging_Duration",
+    "Degradation_Rate",
+    "Charging_Mode",
+    "Efficiency",
+    "Battery_Type",
+    "Charging_Cycles",
+    "EV_Model"
+  ],
+  "training_timestamp": "2026-08-17T14:45:10.640764+00:00",
+  "validation_metrics": {
+    "accuracy": 1.0,
+    "f1_macro": 1.0
+  },
+  "sha256": "6b61c1633ebaa104cd8d7944086b3276bd6ddbee1b354d4dace7114af9312162"
+}
