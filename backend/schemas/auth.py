@@ -3,7 +3,7 @@ Pydantic data validation schemas for authentication and user management.
 """
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRegisterRequest(BaseModel):
@@ -37,12 +37,11 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     """User profile response contract."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     full_name: Optional[str] = None
     role: str
     is_active: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True

@@ -28,10 +28,17 @@ def check_independent_safety_rules(
 ) -> Dict[str, bool]:
     """
     Independent physical safety checks. Fails independently of ML models.
+    Auto-normalizes pack-level voltage (> 10V) to cell-level equivalent.
     """
+    if voltage > 10.0:
+        inferred_series = max(1, round(voltage / 3.7))
+        v_cell = voltage / inferred_series
+    else:
+        v_cell = voltage
+
     safety_violations = {
         "critical_thermal_warning": bool(temperature is not None and temperature >= critical_temp_thresh),
-        "voltage_sag_or_overvoltage": bool(voltage < 2.5 or voltage > 4.3),
+        "voltage_sag_or_overvoltage": bool(v_cell < 2.5 or v_cell > 4.3),
         "overcurrent_fault": bool(abs(current) > 350.0),
         "invalid_soc_bounds": bool(soc < 0.0 or soc > 100.0),
         "resistance_spike_warning": bool(resistance is not None and resistance > resistance_thresh),
@@ -71,12 +78,15 @@ def predict_anomaly(
     iso_flag: Optional[bool] = None
     source = "physical_safety_engine"
 
+    # Normalize voltage if pack voltage was passed
+    v_norm = voltage / max(1, round(voltage / 3.7)) if voltage > 10.0 else voltage
+
     # Supervised XGBoost Classifier Prediction
     if _clf_bundle is not None and _clf_ready:
         try:
             model = _clf_bundle["model"] if isinstance(_clf_bundle, dict) and "model" in _clf_bundle else _clf_bundle
             features = _clf_bundle["features"] if isinstance(_clf_bundle, dict) and "features" in _clf_bundle else ["soc", "voltage", "current", "hour", "dayofweek"]
-            X = pd.DataFrame([{"soc": soc, "voltage": voltage, "current": current, "hour": hour, "dayofweek": dayofweek}])[features]
+            X = pd.DataFrame([{"soc": soc, "voltage": v_norm, "current": current, "hour": hour, "dayofweek": dayofweek}])[features]
             if hasattr(model, "predict_proba"):
                 proba = float(model.predict_proba(X)[0][1])
             source = "trained_model"
@@ -89,7 +99,7 @@ def predict_anomaly(
             iso_model = _iso_bundle["model"] if isinstance(_iso_bundle, dict) and "model" in _iso_bundle else _iso_bundle
             iso_features = _iso_bundle["features"] if isinstance(_iso_bundle, dict) and "features" in _iso_bundle else ["soc", "voltage", "current"]
 
-            payload = {"soc": soc, "voltage": voltage, "current": current, "hour": hour, "dayofweek": dayofweek}
+            payload = {"soc": soc, "voltage": v_norm, "current": current, "hour": hour, "dayofweek": dayofweek}
             if temperature is not None:
                 payload["temperature"] = temperature
             if resistance is not None:

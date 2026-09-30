@@ -11,12 +11,14 @@ Source = Literal["trained_model", "fallback_formula", "ekf_physics_engine"]
 
 
 class EkfSoCRequest(BaseModel):
-    chemistry: Literal["NMC", "LFP"] = Field(..., description="Explicit battery pack chemistry: 'NMC' or 'LFP'")
+    chemistry: Literal["NMC", "LFP"] = Field("NMC", description="Explicit battery pack chemistry: 'NMC' or 'LFP'")
     current: float = Field(..., description="Current in Amperes (Positive = Discharge, Negative = Charge)")
-    measured_voltage: float = Field(..., description="Measured pack terminal voltage in Volts")
+    measured_voltage: float = Field(..., description="Measured pack terminal or cell voltage in Volts")
     nominal_capacity_ah: float = Field(200.0, gt=0, description="Nominal capacity in Ah")
     initial_soc: float = Field(0.80, ge=0.0, le=1.0, description="Initial estimated State of Charge (0.0 to 1.0)")
     dt_seconds: float = Field(1.0, gt=0, description="Sampling time step in seconds")
+    num_cells_series: Optional[int] = Field(None, gt=0, description="Series cell count for auto pack-to-cell scaling")
+    session_id: Optional[str] = Field(None, description="Optional persistent session identifier for recursive tracking")
 
 
 class EkfSoCResponse(BaseModel):
@@ -24,6 +26,7 @@ class EkfSoCResponse(BaseModel):
     polarization_voltage_v: float = Field(..., description="Internal RC polarization voltage (V)")
     innovation_residual_v: float = Field(..., description="Voltage measurement innovation error (V)")
     chemistry: str
+    session_id: Optional[str] = None
     source: Source = "ekf_physics_engine"
 
 
@@ -103,6 +106,7 @@ class ChargingResponse(BaseModel):
 
 
 class AllPredictRequest(BaseModel):
+    soc_ekf: Optional[EkfSoCRequest] = None
     soh: Optional[SoHRequest] = None
     rul: Optional[RULRequest] = None
     anomaly: Optional[AnomalyRequest] = None

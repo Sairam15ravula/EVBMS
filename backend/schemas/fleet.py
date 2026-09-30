@@ -3,20 +3,19 @@ Pydantic schemas for vehicle fleet management, battery packs, alert logs, and te
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BatteryPackSchema(BaseModel):
     """Battery pack configuration response model."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     vehicle_id: str
     serial_number: str
     initial_capacity_ah: float
     cell_count: int
     manufacture_date: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class VehicleCreateRequest(BaseModel):
@@ -35,6 +34,8 @@ class VehicleCreateRequest(BaseModel):
 
 class VehicleResponse(BaseModel):
     """Vehicle asset response contract."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     model: str
@@ -45,12 +46,11 @@ class VehicleResponse(BaseModel):
     created_at: datetime
     battery_pack: Optional[BatteryPackSchema] = None
 
-    class Config:
-        from_attributes = True
-
 
 class AlertLogResponse(BaseModel):
     """Diagnostic alert log response contract."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     timestamp: datetime
     vehicle_id: str
@@ -58,9 +58,6 @@ class AlertLogResponse(BaseModel):
     fault_code: str
     description: str
     acknowledged: bool
-
-    class Config:
-        from_attributes = True
 
 
 class AlertAcknowledgeResponse(BaseModel):
@@ -87,6 +84,8 @@ class TelemetryIngestRequest(BaseModel):
 
 class TelemetryFrameResponse(BaseModel):
     """Telemetry frame query response contract."""
+    model_config = ConfigDict(from_attributes=True)
+
     timestamp: datetime
     vehicle_id: str
     voltage: float
@@ -97,6 +96,3 @@ class TelemetryFrameResponse(BaseModel):
     internal_resistance: float
     cell_voltages: Optional[List[float]] = None
     active_anomalies: Optional[List[Dict[str, Any]]] = None
-
-    class Config:
-        from_attributes = True

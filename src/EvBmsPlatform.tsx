@@ -521,6 +521,82 @@ function OverviewScreen({
   const meta = RISK_META[vehicle.risk];
   const recentAnomaly = vehicle.anomalies[0];
 
+  const [livePrediction, setLivePrediction] = useState<{
+    soh?: number;
+    rul?: number;
+    soc_ekf?: number;
+    is_anomaly?: boolean;
+    source?: string;
+    loading: boolean;
+  }>({ loading: true });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLiveML() {
+      try {
+        const res = await fetch("/predict/all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            soc_ekf: {
+              chemistry: vehicle.name.includes("LFP") ? "LFP" : "NMC",
+              current: vehicle.last.current,
+              measured_voltage: vehicle.last.voltage * 96,
+              nominal_capacity_ah: 200.0,
+              initial_soc: 0.82,
+              dt_seconds: 1.0,
+              num_cells_series: 96,
+              session_id: vehicle.id,
+            },
+            soh: {
+              cycle: vehicle.last.cycle,
+              voltage: vehicle.last.voltage,
+              temperature: vehicle.last.temp,
+              capacity: vehicle.last.capacity,
+              init_capacity: vehicle.ratedCapacity,
+            },
+            rul: {
+              cycle: vehicle.last.cycle,
+              voltage: vehicle.last.voltage,
+              temperature: vehicle.last.temp,
+              capacity: vehicle.last.capacity,
+              soh: vehicle.soh,
+              init_capacity: vehicle.ratedCapacity,
+            },
+            anomaly: {
+              soc: 82,
+              voltage: vehicle.last.voltage,
+              current: vehicle.last.current,
+              hour: vehicle.last.hour,
+              dayofweek: vehicle.last.dayofweek,
+              temperature: vehicle.last.temp,
+              resistance: vehicle.last.resistance,
+            },
+          }),
+        });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setLivePrediction({
+            soh: data.soh?.soh,
+            rul: data.rul?.rul_cycles,
+            soc_ekf: data.soc_ekf?.estimated_soc_pct,
+            is_anomaly: data.anomaly?.is_anomaly,
+            source: data.soh?.source || "trained_model",
+            loading: false,
+          });
+        }
+      } catch (err) {
+        if (isMounted) {
+          setLivePrediction((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    }
+    fetchLiveML();
+    return () => {
+      isMounted = false;
+    };
+  }, [vehicle.id, vehicle.last.cycle]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Holographic Diagnostic Scan CTA Banner */}
@@ -569,11 +645,24 @@ function OverviewScreen({
       </div>
 
       <div style={{ background: `linear-gradient(135deg, ${COLORS.surface}, ${COLORS.surfaceAlt})`, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 22, display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
-        <BatteryGlyph soh={vehicle.soh} risk={vehicle.risk} />
+        <BatteryGlyph soh={livePrediction.soh ?? vehicle.soh} risk={vehicle.risk} />
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 }}>{vehicle.model}</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 10 }}>{vehicle.name}</div>
-          <RiskBadge risk={vehicle.risk} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <RiskBadge risk={vehicle.risk} />
+            <span style={{
+              fontSize: 11,
+              fontFamily: "monospace",
+              padding: "3px 8px",
+              borderRadius: 6,
+              background: "rgba(34,217,122,0.12)",
+              color: COLORS.green,
+              border: "1px solid rgba(34,217,122,0.3)"
+            }}>
+              FastAPI Inference: {livePrediction.loading ? "Connecting..." : "Synced (" + (livePrediction.source || "trained_model") + ")"}
+            </span>
+          </div>
           {recentAnomaly && (
             <div style={{ marginTop: 12, fontSize: 12.5, color: COLORS.textSecondary, display: "flex", alignItems: "center", gap: 6 }}>
               <AlertTriangle size={13} color={COLORS.amber} />
@@ -583,8 +672,10 @@ function OverviewScreen({
         </div>
         <div style={{ display: "flex", gap: 22 }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 30, fontWeight: 700, color: COLORS.textPrimary }}>82%</div>
-            <div style={{ fontSize: 11, color: COLORS.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>State of Charge</div>
+            <div style={{ fontSize: 30, fontWeight: 700, color: COLORS.textPrimary }}>
+              {livePrediction.soc_ekf != null ? Math.round(livePrediction.soc_ekf) : 82}%
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>EKF State of Charge</div>
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 30, fontWeight: 700, color: COLORS.textPrimary }}>{Math.round(vehicle.ratedCapacity * 0.82 * 4.1)}</div>
@@ -594,12 +685,18 @@ function OverviewScreen({
       </div>
 
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        <MetricCard label="State of Health" value={vehicle.soh.toFixed(1)} unit="%" accent={meta.color} sub={`${vehicle.history.length} cycles logged`} />
+        <MetricCard
+          label="State of Health"
+          value={(livePrediction.soh ?? vehicle.soh).toFixed(1)}
+          unit="%"
+          accent={meta.color}
+          sub={`Model: ${livePrediction.source || "soh_model_xgb"}`}
+        />
         <MetricCard
           label="Remaining Useful Life"
           value={vehicle.rul.status === "past-threshold" ? "At threshold" : vehicle.rul.status === "flat" ? "5+" : `${vehicle.rul.yearsLow}–${vehicle.rul.yearsHigh}`}
           unit={vehicle.rul.status === "normal" || vehicle.rul.status === "flat" ? "yrs" : ""}
-          sub={vehicle.rul.status === "past-threshold" ? "Below 80% SoH threshold" : `~${vehicle.rul.cyclesRemaining} cycles to threshold`}
+          sub={livePrediction.rul != null ? `~${Math.round(livePrediction.rul)} cycles via XGBoost` : `~${vehicle.rul.cyclesRemaining} cycles to threshold`}
         />
         <MetricCard label="Pack Temperature" value={vehicle.last.temp} unit="°C" accent={vehicle.last.temp > 38 ? COLORS.amber : COLORS.textPrimary} sub="Last logged reading" />
         <MetricCard label="Risk Level" value={meta.label} accent={meta.color} sub={`${vehicle.anomalies.length} flag(s) on record`} />

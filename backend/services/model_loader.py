@@ -71,6 +71,22 @@ class ModelLoader:
             self.readiness_status[model_filename] = False
             return None, False
 
+    def load_all(self) -> Dict[str, bool]:
+        """Load all known ML models and return readiness status."""
+        known_models = [
+            "soh_model_xgb.joblib",
+            "rul_model_xgb.joblib",
+            "telemetry_anomaly_model.joblib",
+            "telemetry_isolation_forest.joblib",
+            "capacity_fade_model.joblib",
+            "charging_class_model_xgb.joblib",
+        ]
+        results = {}
+        for model_name in known_models:
+            _, success = self.load_model(model_name)
+            results[model_name] = success
+        return results
+
     def get_status(self) -> Dict[str, Any]:
         return self.get_readiness()
 

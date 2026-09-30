@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import EvBmsPlatform from './EvBmsPlatform';
 import { EVVehiclePreset, ScenarioPreset, BatteryTelemetry, HealthMetrics, DegradationPoint, AIExplainResponse, BatteryAnomaly } from './types';
 import { Header } from './components/Header';
@@ -14,6 +14,7 @@ import { LoginModal } from './components/LoginModal';
 import { AuthProvider } from './context/AuthContext';
 import { VEHICLE_PRESETS, SCENARIO_PRESETS, generateLiveTelemetryFrame, generateDegradationCurve } from './data/batteryData';
 import { calculateHealthMetrics } from './utils/analyticsEngine';
+import { telemetrySocket } from './services/telemetrySocket';
 
 function MainApp() {
   const [viewMode, setViewMode] = useState<'platform' | 'lab'>('platform');
@@ -87,9 +88,35 @@ function MainApp() {
     fetchXaiAnalysis();
   }, [selectedVehicleId, selectedScenarioId, viewMode]);
 
-  // Simulation interval loop for Lab view
+  // WebSocket telemetry connection for Lab view
+  const wsConnectedRef = useRef(false);
+  React.useEffect(() => {
+    if (viewMode !== 'lab') return;
+
+    // Connect to WebSocket server
+    telemetrySocket.connect();
+    wsConnectedRef.current = true;
+
+    // Subscribe to telemetry updates
+    const unsubscribe = telemetrySocket.subscribe((frame: BatteryTelemetry) => {
+      setTelemetry(frame);
+      setHealthMetrics(calculateHealthMetrics(frame, currentVehicle));
+      setTelemetryHistory((prevHistory) => {
+        const updated = [...prevHistory, frame];
+        return updated.length > 30 ? updated.slice(updated.length - 30) : updated;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      wsConnectedRef.current = false;
+    };
+  }, [viewMode, currentVehicle]);
+
+  // Fallback simulation loop when WebSocket is not connected
   React.useEffect(() => {
     if (viewMode !== 'lab' || !isSimulating) return;
+    if (wsConnectedRef.current && telemetrySocket.getIsConnected()) return;
 
     const intervalMs = Math.max(200, 1500 / simSpeed);
     const timer = setInterval(() => {

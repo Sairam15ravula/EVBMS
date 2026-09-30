@@ -55,20 +55,22 @@ class ExtendedKalmanFilterSoC:
         c1_farad: float = 2000.0,
         dt_seconds: float = 1.0,
         initial_soc: float = 0.80,
+        num_cells_series: Optional[int] = None,
     ):
         if chemistry.upper() not in OCV_SOC_CURVES:
             raise ValueError(f"Explicit chemistry must be specified ('NMC' or 'LFP'). Got: '{chemistry}'")
 
         self.chemistry = chemistry.upper()
-        self.q_max_coulombs = nominal_capacity_ah * 3600.0  # Ah to Ampere-seconds
+        self.num_cells_series = num_cells_series
+        self.q_max_coulombs = max(1e-3, nominal_capacity_ah) * 3600.0  # Ah to Ampere-seconds
         self.r0 = r0_ohm
         self.r1 = r1_ohm
         self.c1 = c1_farad
-        self.tau = r1_ohm * c1_farad
-        self.dt = dt_seconds
+        self.tau = max(1e-4, r1_ohm * c1_farad)
+        self.dt = max(1e-4, dt_seconds)
 
         # State vector: [z, v_rc]
-        self.x = np.array([[initial_soc], [0.0]], dtype=float)
+        self.x = np.array([[np.clip(initial_soc, 0.0, 1.0)], [0.0]], dtype=float)
 
         # State Covariance P
         self.P = np.diag([1e-4, 1e-4])
@@ -82,10 +84,22 @@ class ExtendedKalmanFilterSoC:
     def step(self, current_amps: float, measured_voltage_v: float) -> Tuple[float, float, float]:
         """
         Execute one EKF predict-update step.
+        Auto-normalizes pack voltage if measured_voltage_v > 10.0 V.
         Returns (estimated_soc_pct, polarization_voltage_v, innovation_residual_v).
         """
         dt = self.dt
         eta = 0.98 if current_amps < 0 else 1.0  # Coulombic efficiency
+
+        # Normalize pack voltage to single-cell equivalent if pack voltage was passed
+        if measured_voltage_v > 10.0:
+            if self.num_cells_series is not None and self.num_cells_series > 0:
+                v_cell = measured_voltage_v / self.num_cells_series
+            else:
+                nominal_cell = 3.2 if self.chemistry == "LFP" else 3.7
+                inferred_cells = max(1, round(measured_voltage_v / nominal_cell))
+                v_cell = measured_voltage_v / inferred_cells
+        else:
+            v_cell = measured_voltage_v
 
         # --- 1. Predict Step ---
         soc_prev = float(self.x[0, 0])
@@ -109,8 +123,8 @@ class ExtendedKalmanFilterSoC:
         ocv_pred = get_ocv(soc_pred, self.chemistry)
         v_pred = ocv_pred - current_amps * self.r0 - v_rc_pred
 
-        # Innovation Residual y
-        y = measured_voltage_v - v_pred
+        # Innovation Residual y (computed on normalized cell basis)
+        y = v_cell - v_pred
 
         # Measurement Matrix H = [d(OCV)/d(SoC), -1]
         docv_dz = get_docv_dsoc(soc_pred, self.chemistry)
@@ -132,6 +146,35 @@ class ExtendedKalmanFilterSoC:
 
         estimated_soc_pct = float(self.x[0, 0] * 100.0)
         return estimated_soc_pct, float(self.x[1, 0]), float(y)
+
+
+# Session-based EKF in-memory state tracking to maintain continuity across API calls
+_EKF_SESSION_CACHE: Dict[str, ExtendedKalmanFilterSoC] = {}
+
+
+def get_or_create_ekf(
+    session_id: Optional[str],
+    chemistry: str,
+    nominal_capacity_ah: float = 200.0,
+    dt_seconds: float = 1.0,
+    initial_soc: float = 0.80,
+    num_cells_series: Optional[int] = None,
+) -> Tuple[ExtendedKalmanFilterSoC, str]:
+    import uuid
+    sid = session_id or str(uuid.uuid4())
+    if sid in _EKF_SESSION_CACHE:
+        ekf = _EKF_SESSION_CACHE[sid]
+        if ekf.chemistry == chemistry.upper():
+            return ekf, sid
+    ekf = ExtendedKalmanFilterSoC(
+        chemistry=chemistry,
+        nominal_capacity_ah=nominal_capacity_ah,
+        dt_seconds=dt_seconds,
+        initial_soc=initial_soc,
+        num_cells_series=num_cells_series,
+    )
+    _EKF_SESSION_CACHE[sid] = ekf
+    return ekf, sid
 
 
 def validate_ekf_accuracy(

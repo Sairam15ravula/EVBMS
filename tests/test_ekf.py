@@ -70,3 +70,37 @@ def test_ekf_accuracy_target():
     assert metrics["mae_pct"] <= 2.0, f"EKF MAE {metrics['mae_pct']:.2f}% exceeds acceptance threshold of 2.0%"
     assert metrics["rmse_pct"] <= 2.0, f"EKF RMSE {metrics['rmse_pct']:.2f}% exceeds acceptance threshold of 2.0%"
     assert metrics["max_error_pct"] <= 5.0
+
+
+def test_ekf_pack_voltage_autoscaling():
+    from backend.services.soc_ekf import ExtendedKalmanFilterSoC
+    ekf = ExtendedKalmanFilterSoC(initial_soc=0.85, chemistry="NMC", nominal_capacity_ah=200.0, num_cells_series=96)
+    # Measured pack voltage = 365.0 V (approx 3.80V per cell)
+    soc_pct, v_rc, residual = ekf.step(current_amps=15.0, measured_voltage_v=365.0)
+    assert 0.0 <= soc_pct <= 100.0
+    # Innovation residual should be bounded to cell voltage delta (< 0.5 V), NOT hundreds of volts
+    assert abs(residual) < 0.5, f"Residual {residual} blew up on pack voltage input!"
+
+
+def test_ekf_session_continuity():
+    from backend.services.soc_ekf import get_or_create_ekf
+    ekf1, sid1 = get_or_create_ekf("test-session-123", chemistry="NMC", initial_soc=0.85)
+    
+    # Run 5 discharge steps with first reference
+    soc_prev = 85.0
+    for _ in range(5):
+        v_meas = get_ocv(ekf1.x[0, 0], "NMC") - (30.0 * (ekf1.r0 + ekf1.r1))
+        soc_prev, _, _ = ekf1.step(current_amps=30.0, measured_voltage_v=v_meas)
+
+    # Calling again with same session ID must reuse filter and continue state
+    ekf2, sid2 = get_or_create_ekf("test-session-123", chemistry="NMC")
+    assert sid1 == sid2
+    assert ekf1 is ekf2
+
+    # Run another 5 steps with second reference
+    soc_next = soc_prev
+    for _ in range(5):
+        v_meas = get_ocv(ekf2.x[0, 0], "NMC") - (30.0 * (ekf2.r0 + ekf2.r1))
+        soc_next, _, _ = ekf2.step(current_amps=30.0, measured_voltage_v=v_meas)
+
+    assert soc_next < soc_prev, f"Expected descending SoC across session, got {soc_next} vs {soc_prev}"

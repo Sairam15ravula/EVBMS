@@ -11,3 +11,4 @@ alembic>=1.13.1
 psycopg2-binary>=2.9.9
 pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4
+aiosqlite>=0.20.0

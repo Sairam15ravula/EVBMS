@@ -16,6 +16,17 @@ class VehicleRepository(BaseRepository[VehicleModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(VehicleModel, session)
 
+    async def get_all(self, limit: int = 50, offset: int = 0) -> List[VehicleModel]:
+        """Fetch all vehicles with associated battery pack eager loaded."""
+        query = (
+            select(VehicleModel)
+            .options(selectinload(VehicleModel.battery_pack))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_with_pack(self, vehicle_id: str) -> Optional[VehicleModel]:
         """Fetch vehicle by ID with associated battery pack eager loaded."""
         query = (
@@ -27,8 +38,12 @@ class VehicleRepository(BaseRepository[VehicleModel]):
         return result.scalars().first()
 
     async def get_by_owner(self, owner_id: str) -> List[VehicleModel]:
-        """Fetch all vehicles owned by a specific user."""
-        query = select(VehicleModel).where(VehicleModel.owner_id == owner_id)
+        """Fetch all vehicles owned by a specific user with pack eager loaded."""
+        query = (
+            select(VehicleModel)
+            .where(VehicleModel.owner_id == owner_id)
+            .options(selectinload(VehicleModel.battery_pack))
+        )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 

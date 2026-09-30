@@ -16,20 +16,22 @@ from services import rul as rul_service
 from services import anomaly as anomaly_service
 from services import capacity as capacity_service
 from services import charging as charging_service
-from services.soc_ekf import ExtendedKalmanFilterSoC
+from services.soc_ekf import ExtendedKalmanFilterSoC, get_or_create_ekf
 
 router = APIRouter(prefix="/predict", tags=["predict"])
 
 
 @router.post("/soc-ekf", response_model=EkfSoCResponse)
 def predict_soc_ekf(req: EkfSoCRequest):
-    """Estimate State of Charge (SoC) using 1RC Extended Kalman Filter for NMC/LFP chemistry."""
+    """Estimate State of Charge (SoC) using 1RC Extended Kalman Filter with session continuity."""
     try:
-        ekf = ExtendedKalmanFilterSoC(
+        ekf, sid = get_or_create_ekf(
+            session_id=req.session_id,
             chemistry=req.chemistry,
             nominal_capacity_ah=req.nominal_capacity_ah,
             dt_seconds=req.dt_seconds,
             initial_soc=req.initial_soc,
+            num_cells_series=req.num_cells_series,
         )
         soc_pct, v_rc, residual = ekf.step(req.current, req.measured_voltage)
         return EkfSoCResponse(
@@ -37,6 +39,7 @@ def predict_soc_ekf(req: EkfSoCRequest):
             polarization_voltage_v=round(v_rc, 4),
             innovation_residual_v=round(residual, 4),
             chemistry=req.chemistry,
+            session_id=sid,
             source="ekf_physics_engine",
         )
     except ValueError as ve:
@@ -100,6 +103,8 @@ def predict_charging(req: ChargingRequest):
 @router.post("/all")
 def predict_all(req: AllPredictRequest):
     out = {}
+    if req.soc_ekf:
+        out["soc_ekf"] = predict_soc_ekf(req.soc_ekf)
     if req.soh:
         out["soh"] = predict_soh(req.soh)
     if req.rul:
@@ -111,5 +116,5 @@ def predict_all(req: AllPredictRequest):
     if req.charging:
         out["charging"] = predict_charging(req.charging)
     if not out:
-        raise HTTPException(status_code=400, detail="Provide at least one of: soh, rul, anomaly, capacity, charging")
+        raise HTTPException(status_code=400, detail="Provide at least one of: soc_ekf, soh, rul, anomaly, capacity, charging")
     return out
