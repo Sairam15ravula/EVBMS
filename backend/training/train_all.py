@@ -29,7 +29,10 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import xgboost as xgb
 
-from generate_synthetic_data import build_datasets, EOL_THRESHOLD
+try:
+    from backend.training.generate_synthetic_data import build_datasets, EOL_THRESHOLD
+except ImportError:
+    from generate_synthetic_data import build_datasets, EOL_THRESHOLD
 
 from pathlib import Path
 warnings.filterwarnings("ignore")

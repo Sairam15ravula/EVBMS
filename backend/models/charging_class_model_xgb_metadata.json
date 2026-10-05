@@ -18,10 +18,11 @@
     "Charging_Cycles",
     "EV_Model"
   ],
-  "training_timestamp": "2026-08-17T14:45:10.640764+00:00",
+  "training_timestamp": "2026-10-05T15:03:21.264317+00:00",
   "validation_metrics": {
     "accuracy": 1.0,
     "f1_macro": 1.0
   },
-  "sha256": "6b61c1633ebaa104cd8d7944086b3276bd6ddbee1b354d4dace7114af9312162"
+  "sha256": "c739b5fe76407dae6321f38f37b8a968a3d19fa04c2d2499490814d47e4f298d",
+  "scikit_learn_version": "1.9.1"
 }

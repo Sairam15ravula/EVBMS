@@ -13,6 +13,9 @@ evbms/
 *.db
 *.sqlite
 *.sqlite3
+.venv/
+.venv*/
+*.egg-info/
 
 # IDE and AI assistant metadata
 .vscode/

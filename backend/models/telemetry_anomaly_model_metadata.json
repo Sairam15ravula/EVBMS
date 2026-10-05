@@ -11,10 +11,11 @@
     "hour",
     "dayofweek"
   ],
-  "training_timestamp": "2026-08-17T14:45:11.825371+00:00",
+  "training_timestamp": "2026-10-05T15:03:22.288478+00:00",
   "validation_metrics": {
     "accuracy": 0.9989524279023909,
     "f1": 0.9467084639498433
   },
-  "sha256": "4a52b89f0128b0a5a83034b1e24b754dbd3549940e43dc13f138a321dd143c26"
+  "sha256": "a5faac05862872598d37d7c1c1b9ac4da28488a864cd679da241d2bfc366432d",
+  "scikit_learn_version": "1.9.1"
 }

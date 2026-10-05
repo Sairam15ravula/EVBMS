@@ -12,11 +12,12 @@
     "soh",
     "init_capacity"
   ],
-  "training_timestamp": "2026-08-17T14:45:10.481624+00:00",
+  "training_timestamp": "2026-10-05T15:03:21.057838+00:00",
   "validation_metrics": {
     "mae": 16.22984504699707,
     "rmse": 32.95166174442117,
     "r2": 0.5344372391700745
   },
-  "sha256": "5d230b879611db8f080de5b8527967957efa0f54715716ae1e70bcbc02760ec6"
+  "sha256": "5d230b879611db8f080de5b8527967957efa0f54715716ae1e70bcbc02760ec6",
+  "scikit_learn_version": "1.9.1"
 }

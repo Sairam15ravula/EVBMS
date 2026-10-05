@@ -11,11 +11,12 @@
     "capacity",
     "init_capacity"
   ],
-  "training_timestamp": "2026-08-17T14:45:10.258082+00:00",
+  "training_timestamp": "2026-10-05T15:03:20.801680+00:00",
   "validation_metrics": {
     "mae": 0.021004881424862832,
     "rmse": 0.02749263407311017,
     "r2": 0.9243402520953247
   },
-  "sha256": "976f2f26648dd5a3612d39113fdbabbfd4466b7ad5f27c820f0089b20bccd04f"
+  "sha256": "976f2f26648dd5a3612d39113fdbabbfd4466b7ad5f27c820f0089b20bccd04f",
+  "scikit_learn_version": "1.9.1"
 }
