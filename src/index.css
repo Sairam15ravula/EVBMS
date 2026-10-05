@@ -1,1 +1,79 @@
 @import "tailwindcss";
+@source "../src";
+@source "../index.html";
+
+/* ============================================================
+   RESPONSIVE DESIGN — Mobile Breakpoints
+   ============================================================ */
+
+/* Show hamburger button on mobile */
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Sidebar responsive behavior */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .sidebar-open {
+    transform: translateX(0) !important;
+  }
+}
+
+/* Metric cards stack on small screens */
+@media (max-width: 640px) {
+  .metric-cards-container {
+    flex-direction: column !important;
+  }
+
+  .metric-cards-container > * {
+    min-width: 100% !important;
+    width: 100% !important;
+  }
+}
+
+/* Charts responsive with min-width handling */
+@media (max-width: 768px) {
+  .chart-container {
+    min-width: 0 !important;
+    overflow-x: auto;
+  }
+
+  .chart-container > div {
+    min-width: 300px;
+  }
+}
+
+/* Responsive padding for main content */
+@media (max-width: 640px) {
+  .main-content {
+    padding: 12px !important;
+  }
+}
+
+/* Responsive grid for overview cards */
+@media (max-width: 1024px) {
+  .overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Small screen adjustments for top bar */
+@media (max-width: 768px) {
+  .top-bar {
+    padding: 0 12px !important;
+    gap: 10px !important;
+  }
+
+  .top-bar select {
+    max-width: 160px;
+    font-size: 12px !important;
+  }
+}

@@ -14,6 +14,7 @@ root_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_dir))
 sys.path.insert(0, str(root_dir / "backend"))
 
+# pyrefly: ignore [missing-import]
 from backend.db.base import Base  # noqa: E402
 
 config = context.config
@@ -24,10 +25,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url with environment variable if set
-db_url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
-if db_url.startswith("postgresql://"):
+db_url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+if db_url and db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-config.set_main_option("sqlalchemy.url", db_url)
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:

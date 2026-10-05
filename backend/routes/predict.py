@@ -1,9 +1,12 @@
 """
 Prediction routes for ML & EKF Physics inference:
   POST /predict/soc-ekf, /predict/soh, /predict/rul, /predict/anomaly,
-       /predict/capacity, /predict/charging, /predict/all
+       /predict/capacity, /predict/charging, /predict/all, /predict/batch
 """
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from schemas.battery import (
     EkfSoCRequest, EkfSoCResponse,
@@ -19,6 +22,24 @@ from services import charging as charging_service
 from services.soc_ekf import ExtendedKalmanFilterSoC, get_or_create_ekf
 
 router = APIRouter(prefix="/predict", tags=["predict"])
+
+
+class BatchPredictRequest(BaseModel):
+    """Batch prediction request containing multiple prediction items."""
+
+    predictions: List[AllPredictRequest] = Field(
+        ..., min_length=1, max_length=100,
+        description="List of prediction requests to process",
+    )
+
+
+class BatchPredictResponse(BaseModel):
+    """Batch prediction response with individual results and summary."""
+
+    results: List[Dict[str, Any]]
+    total: int
+    successful: int
+    failed: int
 
 
 @router.post("/soc-ekf", response_model=EkfSoCResponse)
@@ -60,8 +81,23 @@ def predict_soh(req: SoHRequest):
 @router.post("/rul", response_model=RULResponse)
 def predict_rul(req: RULRequest):
     try:
-        rul, status, source = rul_service.predict_rul(req.cycle, req.voltage, req.temperature, req.capacity, req.soh, req.init_capacity)
-        return RULResponse(rul_cycles=round(rul, 1), status=status, source=source)
+        rul, status, source, rul_lower, rul_upper, interval_width = rul_service.predict_rul(
+            req.cycle, req.voltage, req.temperature, req.capacity, req.soh, req.init_capacity
+        )
+        conf_interval = (
+            [round(rul_lower, 1), round(rul_upper, 1)]
+            if rul_lower is not None and rul_upper is not None
+            else None
+        )
+        return RULResponse(
+            rul_cycles=round(rul, 1),
+            status=status,
+            source=source,
+            rul_lower=round(rul_lower, 1) if rul_lower is not None else None,
+            rul_upper=round(rul_upper, 1) if rul_upper is not None else None,
+            confidence_interval_90=conf_interval,
+            interval_width=round(interval_width, 1) if interval_width is not None else None,
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"RUL prediction failed: {e}")
 
@@ -118,3 +154,40 @@ def predict_all(req: AllPredictRequest):
     if not out:
         raise HTTPException(status_code=400, detail="Provide at least one of: soc_ekf, soh, rul, anomaly, capacity, charging")
     return out
+
+
+@router.post("/batch", response_model=BatchPredictResponse)
+def predict_batch(req: BatchPredictRequest):
+    """
+    Process multiple predictions in batches of 10.
+
+    Accepts a list of prediction requests and returns results for each,
+    processing them in chunks of 10 to manage memory and compute load.
+    """
+    results: List[Dict[str, Any]] = []
+    successful = 0
+    failed = 0
+
+    predictions = req.predictions
+    chunk_size = 10
+
+    for i in range(0, len(predictions), chunk_size):
+        chunk = predictions[i : i + chunk_size]
+        for pred in chunk:
+            try:
+                result = predict_all(pred)
+                results.append({"status": "success", "data": result})
+                successful += 1
+            except HTTPException as e:
+                results.append({"status": "error", "error": e.detail})
+                failed += 1
+            except Exception as e:
+                results.append({"status": "error", "error": str(e)})
+                failed += 1
+
+    return BatchPredictResponse(
+        results=results,
+        total=len(predictions),
+        successful=successful,
+        failed=failed,
+    )

@@ -18,7 +18,7 @@
     "Charging_Cycles",
     "EV_Model"
   ],
-  "training_timestamp": "2026-10-05T15:03:21.264317+00:00",
+  "training_timestamp": "2026-10-05T15:55:50.715614+00:00",
   "validation_metrics": {
     "accuracy": 1.0,
     "f1_macro": 1.0

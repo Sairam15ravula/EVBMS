@@ -1,22 +1,20 @@
 {
   "model_name": "soh_model_xgb",
   "version": "1.0.0",
-  "algorithm": "XGBRegressor",
+  "algorithm": "RandomForestRegressor",
   "dataset": "NASA_B0005_CALCE",
   "feature_schema_version": "v1.0",
   "features": [
     "cycle",
     "voltage",
-    "temperature",
-    "capacity",
-    "init_capacity"
+    "temperature"
   ],
-  "training_timestamp": "2026-10-05T15:03:20.801680+00:00",
+  "training_timestamp": "2026-10-05T15:55:50.031658+00:00",
   "validation_metrics": {
-    "mae": 0.021004881424862832,
-    "rmse": 0.02749263407311017,
-    "r2": 0.9243402520953247
+    "mae": 0.02885518801196581,
+    "rmse": 0.0381410952803256,
+    "r2": 0.8543808447799007
   },
-  "sha256": "976f2f26648dd5a3612d39113fdbabbfd4466b7ad5f27c820f0089b20bccd04f",
+  "sha256": "35187e68cbedcfcdf201076d8e443e0d9ff09427fa7c6e3a990b30b5399a2c79",
   "scikit_learn_version": "1.9.1"
 }

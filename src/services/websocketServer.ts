@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { VEHICLE_PRESETS, SCENARIO_PRESETS, generateLiveTelemetryFrame } from '../data/batteryData';
 import { BatteryTelemetry } from '../types';
+import { validateControlMessage, isPayloadTooLarge } from './websocketValidation';
 
 export const MAX_WS_CONNECTIONS = 50;
 export const MAX_MESSAGES_PER_SECOND = 10;
@@ -59,18 +60,34 @@ class TelemetryWebSocketManager {
           return;
         }
 
+        // Enforce max payload size (1KB)
+        if (isPayloadTooLarge(rawMessage as Buffer)) {
+          console.warn('[WS Gateway] Payload exceeds max size (1KB). Closing connection.');
+          ws.close(1008, 'Payload too large');
+          return;
+        }
+
         try {
           const data = JSON.parse(rawMessage.toString());
-          if (data.type === 'SELECT_VEHICLE' && data.vehicleId) {
+
+          // Validate message against schema
+          if (!validateControlMessage(data)) {
+            console.warn('[WS Gateway] Invalid control message received. Closing connection.');
+            ws.close(1008, 'Invalid message format');
+            return;
+          }
+
+          if (data.type === 'SELECT_VEHICLE') {
             const found = VEHICLE_PRESETS.find(v => v.id === data.vehicleId);
             if (found) currentVehicle = found;
           }
-          if (data.type === 'SELECT_SCENARIO' && data.scenarioId) {
+          if (data.type === 'SELECT_SCENARIO') {
             const found = SCENARIO_PRESETS.find(s => s.id === data.scenarioId);
             if (found) currentScenario = found;
           }
         } catch (e) {
-          // Ignore malformed client control messages
+          console.warn('[WS Gateway] Failed to parse client message:', (e as Error).message);
+          ws.close(1008, 'Malformed message');
         }
       });
 

@@ -55,6 +55,10 @@ export interface HealthMetrics {
   rulCycles: number;       // Remaining Useful Life in cycles
   rulYears: number;        // Remaining Useful Life in estimated years
   rulEstimatedMiles: number; // Estimated remaining driving miles
+  rulLower?: number;       // 5th percentile lower bound
+  rulUpper?: number;       // 95th percentile upper bound
+  confidenceInterval90?: [number, number]; // 90% confidence interval [lower, upper]
+  intervalWidth?: number;  // Interval width in cycles
   eolThreshold: number;    // EOL capacity % (usually 80%)
   degradationRatePer100Cycles: number; // % capacity loss per 100 cycles
   riskLevel: RiskLevel;

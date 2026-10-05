@@ -7,7 +7,7 @@ import {
   Activity, AlertTriangle, Battery, BatteryCharging, Bell, Bot,
   ChevronRight, Clock, Gauge, Info, Send,
   Settings, ShieldAlert, ShieldCheck, Sparkles, TrendingDown,
-  TrendingUp, Wifi, X, Zap, Car, Plug, Layers, Scan
+  TrendingUp, Wifi, X, Zap, Car, Plug, Layers, Scan, Menu
 } from "lucide-react";
 import { CellGridMonitor } from "./components/CellGridMonitor";
 import { EvDiagnosticScan } from "./components/EvDiagnosticScan";
@@ -524,6 +524,10 @@ function OverviewScreen({
   const [livePrediction, setLivePrediction] = useState<{
     soh?: number;
     rul?: number;
+    rul_lower?: number;
+    rul_upper?: number;
+    confidence_interval_90?: [number, number];
+    interval_width?: number;
     soc_ekf?: number;
     is_anomaly?: boolean;
     source?: string;
@@ -579,6 +583,10 @@ function OverviewScreen({
           setLivePrediction({
             soh: data.soh?.soh,
             rul: data.rul?.rul_cycles,
+            rul_lower: data.rul?.rul_lower,
+            rul_upper: data.rul?.rul_upper,
+            confidence_interval_90: data.rul?.confidence_interval_90,
+            interval_width: data.rul?.interval_width,
             soc_ekf: data.soc_ekf?.estimated_soc_pct,
             is_anomaly: data.anomaly?.is_anomaly,
             source: data.soh?.source || "trained_model",
@@ -696,7 +704,13 @@ function OverviewScreen({
           label="Remaining Useful Life"
           value={vehicle.rul.status === "past-threshold" ? "At threshold" : vehicle.rul.status === "flat" ? "5+" : `${vehicle.rul.yearsLow}–${vehicle.rul.yearsHigh}`}
           unit={vehicle.rul.status === "normal" || vehicle.rul.status === "flat" ? "yrs" : ""}
-          sub={livePrediction.rul != null ? `~${Math.round(livePrediction.rul)} cycles via XGBoost` : `~${vehicle.rul.cyclesRemaining} cycles to threshold`}
+          sub={
+            livePrediction.rul != null
+              ? livePrediction.rul_lower != null && livePrediction.rul_upper != null
+                ? `~${Math.round(livePrediction.rul)} cyc [90% CI: ${Math.round(livePrediction.rul_lower)}–${Math.round(livePrediction.rul_upper)}]`
+                : `~${Math.round(livePrediction.rul)} cycles via Quantile GBR`
+              : `~${vehicle.rul.cyclesRemaining} cycles to threshold`
+          }
         />
         <MetricCard label="Pack Temperature" value={vehicle.last.temp} unit="°C" accent={vehicle.last.temp > 38 ? COLORS.amber : COLORS.textPrimary} sub="Last logged reading" />
         <MetricCard label="Risk Level" value={meta.label} accent={meta.color} sub={`${vehicle.anomalies.length} flag(s) on record`} />
@@ -930,25 +944,74 @@ export default function EvBmsPlatform() {
   const [screen, setScreen] = useState("overview");
   const [doctorOpen, setDoctorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const vehicle = fleet.find((v) => v.id === selectedId) || fleet[0];
+
+  // Close sidebar on navigation (mobile)
+  const handleNavClick = (key: string) => {
+    setScreen(key);
+    setSettingsOpen(false);
+    setSidebarOpen(false);
+  };
 
   return (
     <div style={{ background: COLORS.bg, minHeight: "100vh", display: "flex", fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif", color: COLORS.textPrimary }}>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 40,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
-      <div style={{ width: 208, flexShrink: 0, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "18px 12px", gap: 3 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 10px 20px" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: COLORS.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Zap size={16} color={COLORS.green} />
+      <div
+        className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}
+        style={{
+          width: 208,
+          flexShrink: 0,
+          background: COLORS.surface,
+          borderRight: `1px solid ${COLORS.border}`,
+          display: "flex",
+          flexDirection: "column",
+          padding: "18px 12px",
+          gap: 3,
+          position: "fixed",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          zIndex: 50,
+          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.25s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: COLORS.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Zap size={16} color={COLORS.green} />
+            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.textPrimary, lineHeight: 1.15 }}>
+              EV Battery<br />Intelligence
+            </div>
           </div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.textPrimary, lineHeight: 1.15 }}>
-            EV Battery<br />Intelligence
-          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            style={{ background: "none", border: "none", color: COLORS.textSecondary, cursor: "pointer", padding: 4 }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {NAV_ITEMS.map((item) => (
           <button
             key={item.key}
-            onClick={() => { setScreen(item.key); setSettingsOpen(false); }}
+            onClick={() => handleNavClick(item.key)}
             style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "none",
               background: screen === item.key && !settingsOpen ? COLORS.greenSoft : "transparent",
@@ -964,7 +1027,7 @@ export default function EvBmsPlatform() {
         <div style={{ flex: 1 }} />
 
         <button
-          onClick={() => setSettingsOpen((s) => !s)}
+          onClick={() => { setSettingsOpen((s) => !s); setSidebarOpen(false); }}
           style={{
             display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "none",
             background: settingsOpen ? COLORS.greenSoft : "transparent",
@@ -978,9 +1041,27 @@ export default function EvBmsPlatform() {
       </div>
 
       {/* Main Container */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, marginLeft: 0 }}>
         {/* Top Bar */}
         <div style={{ height: 64, flexShrink: 0, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", padding: "0 22px", gap: 18, background: COLORS.bg }}>
+          {/* Hamburger menu button for mobile */}
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              display: "none",
+              background: "none",
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: 8,
+              padding: "6px 8px",
+              color: COLORS.textSecondary,
+              cursor: "pointer",
+              marginRight: 4,
+            }}
+          >
+            <Menu size={18} />
+          </button>
+
           <div style={{ position: "relative" }}>
             <select
               value={selectedId}

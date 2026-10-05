@@ -8,10 +8,26 @@ from typing import Any, Dict, Optional
 import jwt
 import bcrypt
 
+ENV = os.getenv("ENV", "development")
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "evbms_super_secret_jwt_key_change_in_production_2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+DEFAULT_SECRET_KEY = "evbms_super_secret_jwt_key_change_in_production_2026"
+
+
+def _validate_production_secret() -> None:
+    """Raise RuntimeError if running in production with the default JWT secret key."""
+    if ENV == "production" and SECRET_KEY == DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be set to a non-default value in production. "
+            "Set the JWT_SECRET_KEY environment variable to a secure random string."
+        )
+
+
+# Validate at module import time to fail fast on misconfiguration
+_validate_production_secret()
 
 
 def hash_password(password: str) -> str:

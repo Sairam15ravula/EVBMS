@@ -72,6 +72,9 @@ function MainApp() {
     }
   }, [currentVehicle, currentScenario, telemetry, healthMetrics]);
 
+  // Reactive WebSocket Connection State
+  const [isWsConnected, setIsWsConnected] = useState<boolean>(false);
+
   // Reset telemetry on vehicle / scenario / viewMode change
   React.useEffect(() => {
     if (viewMode !== 'lab') return;
@@ -88,17 +91,21 @@ function MainApp() {
     fetchXaiAnalysis();
   }, [selectedVehicleId, selectedScenarioId, viewMode]);
 
-  // WebSocket telemetry connection for Lab view
-  const wsConnectedRef = useRef(false);
+  // WebSocket telemetry connection & reactive status listener for Lab view
   React.useEffect(() => {
     if (viewMode !== 'lab') return;
 
-    // Connect to WebSocket server
     telemetrySocket.connect();
-    wsConnectedRef.current = true;
 
-    // Subscribe to telemetry updates
-    const unsubscribe = telemetrySocket.subscribe((frame: BatteryTelemetry) => {
+    const unsubscribeStatus = telemetrySocket.onStatusChange((connected) => {
+      setIsWsConnected(connected);
+      if (connected) {
+        telemetrySocket.selectVehicle(selectedVehicleId);
+        telemetrySocket.selectScenario(selectedScenarioId);
+      }
+    });
+
+    const unsubscribeTelemetry = telemetrySocket.subscribe((frame: BatteryTelemetry) => {
       setTelemetry(frame);
       setHealthMetrics(calculateHealthMetrics(frame, currentVehicle));
       setTelemetryHistory((prevHistory) => {
@@ -108,15 +115,23 @@ function MainApp() {
     });
 
     return () => {
-      unsubscribe();
-      wsConnectedRef.current = false;
+      unsubscribeStatus();
+      unsubscribeTelemetry();
     };
   }, [viewMode, currentVehicle]);
+
+  // Sync vehicle and scenario selection changes over WebSocket
+  React.useEffect(() => {
+    if (viewMode === 'lab' && isWsConnected) {
+      telemetrySocket.selectVehicle(selectedVehicleId);
+      telemetrySocket.selectScenario(selectedScenarioId);
+    }
+  }, [selectedVehicleId, selectedScenarioId, viewMode, isWsConnected]);
 
   // Fallback simulation loop when WebSocket is not connected
   React.useEffect(() => {
     if (viewMode !== 'lab' || !isSimulating) return;
-    if (wsConnectedRef.current && telemetrySocket.getIsConnected()) return;
+    if (isWsConnected) return;
 
     const intervalMs = Math.max(200, 1500 / simSpeed);
     const timer = setInterval(() => {
@@ -137,7 +152,8 @@ function MainApp() {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [viewMode, isSimulating, simSpeed, currentVehicle, currentScenario]);
+  }, [viewMode, isSimulating, simSpeed, isWsConnected, currentVehicle, currentScenario]);
+
 
   const handleResetSimulation = () => {
     setTimeStep(0);
@@ -266,27 +282,31 @@ function MainApp() {
         </div>
 
         <XaiAnalysisCard
-          aiAnalysis={aiAnalysis}
+          analysis={aiAnalysis}
           isLoading={isXaiLoading}
-          onRefresh={fetchXaiAnalysis}
+          onRefreshXai={fetchXaiAnalysis}
+          onOpenDoctor={() => setIsDoctorOpen(true)}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <AlertFeed
               anomalies={healthMetrics.anomalies}
-              onAskDoctor={handleAskDoctorAboutAnomaly}
+              onAskDoctorAboutAnomaly={handleAskDoctorAboutAnomaly}
             />
           </div>
           <div>
             <SmartRecommendations
-              recommendations={healthMetrics.recommendations}
+              telemetry={telemetry}
+              healthMetrics={healthMetrics}
+              vehicle={currentVehicle}
+              onOpenDoctor={() => setIsDoctorOpen(true)}
             />
           </div>
         </div>
 
         <BmsComparison
-          vehicle={currentVehicle}
+          telemetry={telemetry}
           healthMetrics={healthMetrics}
         />
       </main>

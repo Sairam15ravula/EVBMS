@@ -135,9 +135,18 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
               ~{healthMetrics.rulCycles} Cycles
             </span>
           </div>
-          <p className="text-xs text-slate-400 font-mono">
-            Est. ~{healthMetrics.rulEstimatedMiles.toLocaleString()} driving miles
-          </p>
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>Est. ~{healthMetrics.rulEstimatedMiles.toLocaleString()} mi</span>
+            {healthMetrics.confidenceInterval90 ? (
+              <span className="text-[10px] text-indigo-300 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/40">
+                90% CI: [{healthMetrics.confidenceInterval90[0]}–{healthMetrics.confidenceInterval90[1]} cyc]
+              </span>
+            ) : healthMetrics.rulLower != null && healthMetrics.rulUpper != null ? (
+              <span className="text-[10px] text-indigo-300 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/40">
+                90% CI: [{Math.round(healthMetrics.rulLower)}–{Math.round(healthMetrics.rulUpper)} cyc]
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">

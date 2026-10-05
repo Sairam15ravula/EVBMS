@@ -18,7 +18,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 import sklearn
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import IsolationForest, RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor, IsolationForest, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import GroupKFold, train_test_split
@@ -83,8 +83,8 @@ def run_training() -> None:
     cycle_df = pd.read_csv(DATA_DIR / "battery_cycle_level.csv")
     cycle_df["init_capacity"] = cycle_df.groupby("battery_id")["capacity"].transform("first")
 
-    # 1) SOH Regression: Evaluate Random Forest vs XGBoost with Battery Group Splitting
-    soh_features = ["cycle", "voltage", "temperature", "capacity", "init_capacity"]
+    # 1) SOH Regression: Evaluate Random Forest vs XGBoost with Non-Leaky Features (Rule 2: No Target Leakage)
+    soh_features = ["cycle", "voltage", "temperature"]
     X_soh = cycle_df[soh_features]
     y_soh = cycle_df["soh"]
     groups_soh = cycle_df["battery_id"]
@@ -100,7 +100,7 @@ def run_training() -> None:
     rf_soh_pred = rf_soh.predict(X_soh_te)
     rf_soh_rmse = np.sqrt(mean_squared_error(y_soh_te, rf_soh_pred))
 
-    xgb_soh = XGBRegressor(n_estimators=250, max_depth=4, learning_rate=0.1, random_state=42, n_jobs=2)
+    xgb_soh = XGBRegressor(n_estimators=250, max_depth=4, learning_rate=0.08, random_state=42, n_jobs=2)
     xgb_soh.fit(X_soh_tr, y_soh_tr)
     xgb_soh_pred = xgb_soh.predict(X_soh_te)
     xgb_soh_rmse = np.sqrt(mean_squared_error(y_soh_te, xgb_soh_pred))
@@ -127,8 +127,8 @@ def run_training() -> None:
         soh_metrics,
     )
 
-    # 2) RUL Regression: Evaluate Random Forest vs XGBoost with Battery Group Splitting
-    rul_features = ["cycle", "voltage", "temperature", "capacity", "soh", "init_capacity"]
+    # 2) RUL Regression: Quantile Gradient Boosting with Non-Leaky Features (5th, 50th, 95th quantiles)
+    rul_features = ["cycle", "voltage", "temperature"]
     X_rul = cycle_df[rul_features]
     y_rul = cycle_df["rul"]
 
@@ -136,34 +136,44 @@ def run_training() -> None:
     X_rul_tr, X_rul_te = X_rul.iloc[train_idx_r], X_rul.iloc[test_idx_r]
     y_rul_tr, y_rul_te = y_rul.iloc[train_idx_r], y_rul.iloc[test_idx_r]
 
-    rf_rul = RandomForestRegressor(n_estimators=150, max_depth=6, random_state=42, n_jobs=2)
-    rf_rul.fit(X_rul_tr, y_rul_tr)
-    rf_rul_pred = rf_rul.predict(X_rul_te)
-    rf_rul_rmse = np.sqrt(mean_squared_error(y_rul_te, rf_rul_pred))
+    reg_q05 = GradientBoostingRegressor(loss="quantile", alpha=0.05, n_estimators=100, max_depth=4, learning_rate=0.05, random_state=42)
+    reg_q50 = GradientBoostingRegressor(loss="quantile", alpha=0.50, n_estimators=100, max_depth=4, learning_rate=0.05, random_state=42)
+    reg_q95 = GradientBoostingRegressor(loss="quantile", alpha=0.95, n_estimators=100, max_depth=4, learning_rate=0.05, random_state=42)
 
-    xgb_rul = XGBRegressor(n_estimators=250, max_depth=4, learning_rate=0.1, random_state=42, n_jobs=2)
-    xgb_rul.fit(X_rul_tr, y_rul_tr)
-    xgb_rul_pred = xgb_rul.predict(X_rul_te)
-    xgb_rul_rmse = np.sqrt(mean_squared_error(y_rul_te, xgb_rul_pred))
+    reg_q05.fit(X_rul_tr, y_rul_tr)
+    reg_q50.fit(X_rul_tr, y_rul_tr)
+    reg_q95.fit(X_rul_tr, y_rul_tr)
 
-    if xgb_rul_rmse <= rf_rul_rmse:
-        winning_rul_model = xgb_rul
-        winning_rul_algo = "XGBRegressor"
-        winning_rul_pred = xgb_rul_pred
-    else:
-        winning_rul_model = rf_rul
-        winning_rul_algo = "RandomForestRegressor"
-        winning_rul_pred = rf_rul_pred
+    pred_q05 = reg_q05.predict(X_rul_te)
+    pred_q50 = reg_q50.predict(X_rul_te)
+    pred_q95 = reg_q95.predict(X_rul_te)
+
+    lower = np.clip(np.minimum(pred_q05, pred_q50), 0.0, None)
+    upper = np.clip(np.maximum(pred_q95, pred_q50), 0.0, None)
+    coverage_90 = float(np.mean((y_rul_te >= lower) & (y_rul_te <= upper)))
+    mean_width = float(np.mean(upper - lower))
 
     rul_metrics = {
-        "mae": float(mean_absolute_error(y_rul_te, winning_rul_pred)),
-        "rmse": float(np.sqrt(mean_squared_error(y_rul_te, winning_rul_pred))),
-        "r2": float(r2_score(y_rul_te, winning_rul_pred)),
+        "mae": float(mean_absolute_error(y_rul_te, pred_q50)),
+        "rmse": float(np.sqrt(mean_squared_error(y_rul_te, pred_q50))),
+        "r2": float(r2_score(y_rul_te, pred_q50)),
+        "interval_coverage_90": coverage_90,
+        "mean_interval_width": mean_width,
+    }
+
+    rul_bundle = {
+        "model": reg_q50,
+        "regressor_lower": reg_q05,
+        "regressor_median": reg_q50,
+        "regressor_upper": reg_q95,
+        "features": rul_features,
+        "lower_quantile": 0.05,
+        "upper_quantile": 0.95,
     }
     save_model_with_metadata(
-        {"model": winning_rul_model, "features": rul_features},
+        rul_bundle,
         "rul_model_xgb.joblib",
-        winning_rul_algo,
+        "QuantileGradientBoostingRegressor",
         rul_features,
         rul_metrics,
     )

@@ -34,8 +34,8 @@ class SoHRequest(BaseModel):
     cycle: float = Field(..., description="Cycle index")
     voltage: float
     temperature: float
-    capacity: float = Field(..., description="Most recent measured/reference capacity, kWh")
-    init_capacity: float = Field(75.0, description="Rated capacity, kWh")
+    capacity: Optional[float] = Field(None, description="Optional measured/reference capacity for fallback calculation, kWh")
+    init_capacity: Optional[float] = Field(75.0, description="Optional rated capacity for fallback calculation, kWh")
 
 
 class SoHResponse(BaseModel):
@@ -47,15 +47,19 @@ class RULRequest(BaseModel):
     cycle: float
     voltage: float
     temperature: float
-    capacity: float
-    soh: float
-    init_capacity: float = 75.0
+    capacity: Optional[float] = None
+    soh: Optional[float] = None
+    init_capacity: Optional[float] = 75.0
 
 
 class RULResponse(BaseModel):
     rul_cycles: float
     status: Literal["normal", "past-threshold", "flat", "unavailable"]
     source: Source
+    rul_lower: Optional[float] = None
+    rul_upper: Optional[float] = None
+    confidence_interval_90: Optional[list[float]] = None
+    interval_width: Optional[float] = None
 
 
 class AnomalyRequest(BaseModel):

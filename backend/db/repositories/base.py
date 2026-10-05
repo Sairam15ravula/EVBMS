@@ -5,6 +5,7 @@ from typing import Any, Generic, List, Optional, Type, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# pyrefly: ignore [missing-import]
 from backend.db.base import Base
 
 ModelType = TypeVar("ModelType", bound=Base)

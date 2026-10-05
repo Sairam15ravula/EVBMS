@@ -5,10 +5,12 @@
 import { BatteryTelemetry } from '../types';
 
 type TelemetryCallback = (data: BatteryTelemetry) => void;
+type StatusCallback = (connected: boolean) => void;
 
 class TelemetrySocketClient {
   private socket: WebSocket | null = null;
   private subscribers: Set<TelemetryCallback> = new Set();
+  private statusListeners: Set<StatusCallback> = new Set();
   private isConnected = false;
   private reconnectTimer: any = null;
 
@@ -24,7 +26,7 @@ class TelemetrySocketClient {
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
-        this.isConnected = true;
+        this.setConnectedStatus(true);
         console.log('[TelemetrySocket] Connected to Express WebSocket Gateway:', wsUrl);
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
       };
@@ -39,18 +41,27 @@ class TelemetrySocketClient {
       };
 
       this.socket.onclose = () => {
-        this.isConnected = false;
+        this.setConnectedStatus(false);
         console.log('[TelemetrySocket] Disconnected from WebSocket Gateway. Scheduling reconnect...');
         this.scheduleReconnect(wsUrl);
       };
 
       this.socket.onerror = (err) => {
         console.error('[TelemetrySocket] Error:', err);
+        this.setConnectedStatus(false);
         this.socket?.close();
       };
     } catch (err) {
       console.error('[TelemetrySocket] Failed to create WebSocket connection:', err);
+      this.setConnectedStatus(false);
       this.scheduleReconnect(wsUrl);
+    }
+  }
+
+  private setConnectedStatus(status: boolean) {
+    if (this.isConnected !== status) {
+      this.isConnected = status;
+      this.statusListeners.forEach((listener) => listener(status));
     }
   }
 
@@ -68,9 +79,35 @@ class TelemetrySocketClient {
     };
   }
 
+  public onStatusChange(callback: StatusCallback): () => void {
+    this.statusListeners.add(callback);
+    // Immediately notify with current status
+    callback(this.isConnected);
+    return () => {
+      this.statusListeners.delete(callback);
+    };
+  }
+
+  public send(message: any): boolean {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
+  }
+
+  public selectVehicle(vehicleId: string): void {
+    this.send({ type: 'SELECT_VEHICLE', vehicleId });
+  }
+
+  public selectScenario(scenarioId: string): void {
+    this.send({ type: 'SELECT_SCENARIO', scenarioId });
+  }
+
   public getIsConnected(): boolean {
     return this.isConnected;
   }
 }
 
 export const telemetrySocket = new TelemetrySocketClient();
+

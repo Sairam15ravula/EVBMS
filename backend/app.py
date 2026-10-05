@@ -16,11 +16,17 @@ if str(backend_dir) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.middleware.audit import AuditLoggingMiddleware
+from backend.middleware.request_id import RequestIDMiddleware
+from backend.utils.logger import get_logger
 from routes.alerts import router as alerts_router
 from routes.auth import router as auth_router
+from routes.metrics import router as metrics_router
 from routes.predict import router as predict_router
 from routes.telemetry import router as telemetry_router
 from routes.vehicles import router as vehicles_router
+
+logger = get_logger(__name__)
 
 # Allowed CORS origins - restrict in production
 ALLOWED_ORIGINS = os.getenv(
@@ -32,17 +38,18 @@ ALLOWED_ORIGINS = os.getenv(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events."""
+    logger.info("Application starting up")
     # Startup: load ML models and initialize database
     from services import soh, rul, anomaly, capacity, charging  # noqa: F401
     try:
         from db.session import init_db
         await init_db()
     except Exception as e:
-        print(f"[app-startup] Database init warning: {e}")
-    print("Battery Intelligence APIs, Fleet Management, Auth & ML models ready.")
+        logger.warning(f"Database init warning: {e}")
+    logger.info("Battery Intelligence APIs, Fleet Management, Auth & ML models ready.")
     yield
     # Shutdown: cleanup resources
-    print("[app-shutdown] Shutting down EV Battery Intelligence Platform API.")
+    logger.info("Shutting down EV Battery Intelligence Platform API.")
 
 
 app = FastAPI(
@@ -61,12 +68,19 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+# Request ID middleware — generates/propagates X-Request-ID for tracing
+app.add_middleware(RequestIDMiddleware)
+
+# Audit logging middleware — logs all mutating API calls (POST/PUT/PATCH/DELETE)
+app.add_middleware(AuditLoggingMiddleware)
+
 # Register REST routers
 app.include_router(auth_router)
 app.include_router(vehicles_router)
 app.include_router(telemetry_router)
 app.include_router(alerts_router)
 app.include_router(predict_router)
+app.include_router(metrics_router)
 
 
 @app.get("/")
