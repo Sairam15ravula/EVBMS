@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:frontend": "vitest run",
     "test:backend": "pytest",
-    "train": "python backend/training/train_models.py"
+    "train": "python backend/training/train_models.py",
+    "seed": "python backend/db/seed_demo_data.py"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

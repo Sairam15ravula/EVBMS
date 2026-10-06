@@ -39,8 +39,16 @@ async def register_user(
             detail="A user with this email address already exists.",
         )
 
-    valid_roles = {"admin", "fleet_manager", "technician", "driver"}
-    role = req.role if req.role in valid_roles else "driver"
+    role_normalization = {
+        "admin": "admin",
+        "fleet_manager": "fleet_manager",
+        "fleet_operator": "fleet_manager",
+        "technician": "technician",
+        "service_center": "technician",
+        "driver": "driver",
+        "ev_owner": "driver",
+    }
+    role = role_normalization.get(req.role, "driver")
 
     new_user = await user_repo.create(
         email=req.email,

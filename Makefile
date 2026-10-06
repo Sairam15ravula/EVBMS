@@ -30,6 +30,9 @@ install-frontend:
 train:
 	$(PYTHON) backend/training/train_models.py
 
+seed:
+	$(PYTHON) backend/db/seed_demo_data.py
+
 test: test-backend test-frontend
 
 test-backend:

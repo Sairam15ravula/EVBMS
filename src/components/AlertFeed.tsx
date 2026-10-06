@@ -8,7 +8,7 @@ interface AlertFeedProps {
 }
 
 export const AlertFeed: React.FC<AlertFeedProps> = ({
-  anomalies,
+  anomalies = [],
   onAskDoctorAboutAnomaly
 }) => {
   return (

@@ -15,10 +15,28 @@ import { AuthProvider } from './context/AuthContext';
 import { VEHICLE_PRESETS, SCENARIO_PRESETS, generateLiveTelemetryFrame, generateDegradationCurve } from './data/batteryData';
 import { calculateHealthMetrics } from './utils/analyticsEngine';
 import { telemetrySocket } from './services/telemetrySocket';
+import { EvOwnerDashboard } from './components/views/EvOwnerDashboard';
+import { FleetOperatorDashboard } from './components/views/FleetOperatorDashboard';
+import { ServiceCenterDashboard } from './components/views/ServiceCenterDashboard';
+import { useAuth } from './context/AuthContext';
+
+export type DashboardViewMode = 'owner' | 'fleet' | 'service' | 'lab' | 'platform';
 
 function MainApp() {
-  const [viewMode, setViewMode] = useState<'platform' | 'lab'>('platform');
+  const { user, isAuthenticated } = useAuth();
+  const [viewMode, setViewMode] = useState<DashboardViewMode>('owner');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+
+  // Automatically route to tailored dashboard based on logged-in user role
+  useEffect(() => {
+    if (user?.role === 'driver') {
+      setViewMode('owner');
+    } else if (user?.role === 'fleet_manager') {
+      setViewMode('fleet');
+    } else if (user?.role === 'technician') {
+      setViewMode('service');
+    }
+  }, [user?.role]);
 
   // Simulation State for Lab View
   const [vehicles] = useState<EVVehiclePreset[]>(VEHICLE_PRESETS);
@@ -169,64 +187,13 @@ function MainApp() {
     setTelemetryHistory([initialFrame]);
   };
 
-  if (viewMode === 'platform') {
-    return (
-      <div className="relative">
-        <div className="fixed top-3 right-4 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs">
-          <span className="text-slate-400 font-mono">View:</span>
-          <button
-            onClick={() => setViewMode('platform')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-              viewMode === 'platform'
-                ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            EVBMS Platform
-          </button>
-          <button
-            onClick={() => setViewMode('lab')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-              viewMode === 'lab'
-                ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Telemetry Lab
-          </button>
-        </div>
-        <EvBmsPlatform />
-        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
-      </div>
-    );
-  }
+  const handleOpenDoctorWithPrompt = (prompt?: string) => {
+    setInitialDoctorPrompt(prompt || '');
+    setIsDoctorOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-slate-950 pb-12">
-      <div className="fixed top-3 right-4 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs">
-        <span className="text-slate-400 font-mono">View:</span>
-        <button
-          onClick={() => setViewMode('platform')}
-          className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-            viewMode === 'platform'
-              ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          EVBMS Platform
-        </button>
-        <button
-          onClick={() => setViewMode('lab')}
-          className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-            viewMode === 'lab'
-              ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/30'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Telemetry Lab
-        </button>
-      </div>
-
       <Header
         vehicles={vehicles}
         scenarios={scenarios}
@@ -239,81 +206,189 @@ function MainApp() {
         onToggleSimulation={() => setIsSimulating(!isSimulating)}
         onChangeSpeed={setSimSpeed}
         onResetSimulation={handleResetSimulation}
-        onOpenDoctor={() => {
-          setInitialDoctorPrompt('');
-          setIsDoctorOpen(true);
-        }}
+        onOpenDoctor={() => handleOpenDoctorWithPrompt()}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
       />
 
+      {/* Role-Based Dashboard View Switcher Toolbar */}
+      <div className="bg-slate-950/90 border-b border-slate-800 px-4 lg:px-8 py-2 sticky top-[68px] z-30 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+            <span className="text-slate-400 mr-2 flex items-center gap-1">
+              <span>Persona View:</span>
+            </span>
+            <button
+              onClick={() => setViewMode('owner')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewMode === 'owner'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              🚗 <span>EV Owner</span>
+            </button>
+            <button
+              onClick={() => setViewMode('fleet')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewMode === 'fleet'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              📊 <span>Fleet Operator</span>
+            </button>
+            <button
+              onClick={() => setViewMode('service')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewMode === 'service'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              🔧 <span>Service Center</span>
+            </button>
+            <button
+              onClick={() => setViewMode('lab')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewMode === 'lab'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              ⚡ <span>Telemetry Lab</span>
+            </button>
+            <button
+              onClick={() => setViewMode('platform')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewMode === 'platform'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              🏢 <span>Full Platform</span>
+            </button>
+          </div>
+
+          {isAuthenticated && user && (
+            <div className="text-[11px] text-slate-400 flex items-center gap-2">
+              <span>Signed in as: <strong className="text-emerald-400">{user.email}</strong></span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 uppercase font-bold text-slate-300">
+                {user.role}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto px-4 lg:px-8 pt-6 space-y-6">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 font-mono">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-cyan-400 uppercase">Active Profile:</span>
-              <span className="text-sm font-bold text-white">{currentScenario.title}</span>
-            </div>
-            <p className="text-xs text-slate-400 font-sans">{currentScenario.description}</p>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs shrink-0">
-            <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 block text-[10px]">PACK CHEMISTRY</span>
-              <span className="text-white font-bold">{currentVehicle.chemistry} ({currentVehicle.totalEnergyKwh} kWh)</span>
-            </div>
-            <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-              <span className="text-slate-400 block text-[10px]">MAX DCFC POWER</span>
-              <span className="text-cyan-400 font-bold">{currentVehicle.maxChargingKw} kW</span>
-            </div>
-          </div>
-        </div>
-
-        <MetricCards
-          telemetry={telemetry}
-          healthMetrics={healthMetrics}
-          vehicle={currentVehicle}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TelemetryChart
-            history={telemetryHistory}
-            currentTelemetry={telemetry}
+        {viewMode === 'owner' && (
+          <EvOwnerDashboard
+            vehicle={currentVehicle}
+            telemetry={telemetry}
+            healthMetrics={healthMetrics}
+            onOpenDoctor={handleOpenDoctorWithPrompt}
           />
-          <DegradationChart
-            degradationData={degradationCurve}
-            currentCycle={telemetry.cycleCount}
-            currentSoh={healthMetrics.soh}
+        )}
+
+        {viewMode === 'fleet' && (
+          <FleetOperatorDashboard
+            onSelectVehicle={(vehId) => {
+              const matched = vehicles.find((v) => v.id === vehId);
+              if (matched) {
+                setSelectedVehicleId(vehId);
+              }
+              setViewMode('owner');
+            }}
+            onOpenDoctor={handleOpenDoctorWithPrompt}
           />
-        </div>
+        )}
 
-        <XaiAnalysisCard
-          analysis={aiAnalysis}
-          isLoading={isXaiLoading}
-          onRefreshXai={fetchXaiAnalysis}
-          onOpenDoctor={() => setIsDoctorOpen(true)}
-        />
+        {viewMode === 'service' && (
+          <ServiceCenterDashboard
+            vehicle={currentVehicle}
+            telemetry={telemetry}
+            healthMetrics={healthMetrics}
+            onOpenDoctor={handleOpenDoctorWithPrompt}
+          />
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <AlertFeed
-              anomalies={healthMetrics.anomalies}
-              onAskDoctorAboutAnomaly={handleAskDoctorAboutAnomaly}
-            />
+        {viewMode === 'platform' && (
+          <div className="rounded-2xl overflow-hidden border border-slate-800">
+            <EvBmsPlatform />
           </div>
-          <div>
-            <SmartRecommendations
+        )}
+
+        {viewMode === 'lab' && (
+          <>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 font-mono">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-cyan-400 uppercase">Active Profile:</span>
+                  <span className="text-sm font-bold text-white">{currentScenario.title}</span>
+                </div>
+                <p className="text-xs text-slate-400 font-sans">{currentScenario.description}</p>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs shrink-0">
+                <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">PACK CHEMISTRY</span>
+                  <span className="text-white font-bold">{currentVehicle.chemistry} ({currentVehicle.totalEnergyKwh} kWh)</span>
+                </div>
+                <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">MAX DCFC POWER</span>
+                  <span className="text-cyan-400 font-bold">{currentVehicle.maxChargingKw} kW</span>
+                </div>
+              </div>
+            </div>
+
+            <MetricCards
               telemetry={telemetry}
               healthMetrics={healthMetrics}
               vehicle={currentVehicle}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <TelemetryChart
+                history={telemetryHistory}
+                currentTelemetry={telemetry}
+              />
+              <DegradationChart
+                degradationData={degradationCurve}
+                currentCycle={telemetry.cycleCount}
+                currentSoh={healthMetrics.soh}
+              />
+            </div>
+
+            <XaiAnalysisCard
+              analysis={aiAnalysis}
+              isLoading={isXaiLoading}
+              onRefreshXai={fetchXaiAnalysis}
               onOpenDoctor={() => setIsDoctorOpen(true)}
             />
-          </div>
-        </div>
 
-        <BmsComparison
-          telemetry={telemetry}
-          healthMetrics={healthMetrics}
-        />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <AlertFeed
+                  anomalies={healthMetrics.anomalies}
+                  onAskDoctorAboutAnomaly={handleAskDoctorAboutAnomaly}
+                />
+              </div>
+              <div>
+                <SmartRecommendations
+                  telemetry={telemetry}
+                  healthMetrics={healthMetrics}
+                  vehicle={currentVehicle}
+                  onOpenDoctor={() => setIsDoctorOpen(true)}
+                />
+              </div>
+            </div>
+
+            <BmsComparison
+              telemetry={telemetry}
+              healthMetrics={healthMetrics}
+            />
+          </>
+        )}
       </main>
 
       <DigitalDoctorDrawer

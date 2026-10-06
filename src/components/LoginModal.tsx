@@ -111,6 +111,57 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
+            {/* Quick Demo Accounts Selection */}
+            {!isRegisterMode && (
+              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
+                <span className="text-[11px] font-mono text-slate-400 block uppercase font-bold">
+                  Quick Demo Accounts (1-Click Fill):
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('owner@evbms.demo');
+                      setPassword('Owner123!');
+                    }}
+                    className="p-1.5 text-left rounded-lg bg-indigo-950/50 hover:bg-indigo-900/80 border border-indigo-800/60 text-indigo-300 transition"
+                  >
+                    🚗 <strong>EV Owner</strong>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('fleet@evbms.demo');
+                      setPassword('Fleet123!');
+                    }}
+                    className="p-1.5 text-left rounded-lg bg-cyan-950/50 hover:bg-cyan-900/80 border border-cyan-800/60 text-cyan-300 transition"
+                  >
+                    📊 <strong>Fleet Operator</strong>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('technician@evbms.demo');
+                      setPassword('Tech123!');
+                    }}
+                    className="p-1.5 text-left rounded-lg bg-purple-950/50 hover:bg-purple-900/80 border border-purple-800/60 text-purple-300 transition"
+                  >
+                    🔧 <strong>Service Center</strong>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('admin@evbms.demo');
+                      setPassword('Admin123!');
+                    }}
+                    className="p-1.5 text-left rounded-lg bg-emerald-950/50 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 transition"
+                  >
+                    🛡️ <strong>Admin</strong>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {isRegisterMode && (
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Full Name</label>
