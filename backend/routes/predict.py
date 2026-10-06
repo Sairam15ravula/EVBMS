@@ -13,6 +13,7 @@ from schemas.battery import (
     SoHRequest, SoHResponse, RULRequest, RULResponse,
     AnomalyRequest, AnomalyResponse, CapacityRequest, CapacityResponse,
     ChargingRequest, ChargingResponse, AllPredictRequest,
+    ExplainRequest, ExplainResponse, ChatDoctorRequest, ChatDoctorResponse,
 )
 from services import soh as soh_service
 from services import rul as rul_service
@@ -20,6 +21,11 @@ from services import anomaly as anomaly_service
 from services import capacity as capacity_service
 from services import charging as charging_service
 from services.soc_ekf import ExtendedKalmanFilterSoC, get_or_create_ekf
+from services.xai_explainer import (
+    shap_service,
+    chat_digital_doctor,
+    generate_grounded_xai_analysis,
+)
 
 router = APIRouter(prefix="/predict", tags=["predict"])
 
@@ -261,3 +267,83 @@ async def predict_batch(req: BatchPredictRequest):
         successful=successful,
         failed=failed,
     )
+
+
+@router.post("/explain", response_model=ExplainResponse)
+def explain_predictions(req: ExplainRequest):
+    """
+    Generate TreeSHAP attributions for SoH, RUL, and Anomaly models,
+    accompanied by grounded degradation diagnosis.
+    """
+    try:
+        cycle = req.cycle if req.cycle is not None else 60.0
+        voltage = req.voltage if req.voltage is not None else 370.0
+        temperature = req.temperature if req.temperature is not None else 25.0
+        soc = req.soc if req.soc is not None else 80.0
+        current = req.current if req.current is not None else 20.0
+        hour = req.hour if req.hour is not None else 12
+        dayofweek = req.dayofweek if req.dayofweek is not None else 2
+
+        soh_shap = shap_service.explain_soh(cycle=cycle, voltage=voltage, temperature=temperature)
+        rul_shap = shap_service.explain_rul(cycle=cycle, voltage=voltage, temperature=temperature)
+        anomaly_shap = shap_service.explain_anomaly(
+            soc=soc, voltage=voltage, current=current, hour=hour, dayofweek=dayofweek
+        )
+
+        analysis = generate_grounded_xai_analysis(
+            vehicle_info=req.vehicle_info or {"name": "EV Pack", "chemistry": "NMC"},
+            telemetry_frame={
+                "cycleCount": cycle,
+                "voltage": voltage,
+                "temperature": temperature,
+                "soc": soc,
+                "current": current,
+                "internalResistance": 14.5,
+            },
+            health_metrics={
+                "soh": req.soh or round(soh_shap["prediction"] * 100.0, 1),
+                "rulCycles": round(rul_shap["prediction"], 1),
+                "rulYears": round(rul_shap["prediction"] / 120.0, 1),
+                "healthStatusText": "GOOD" if (req.soh or 90.0) >= 80.0 else "DEGRADED",
+                "riskLevel": "LOW",
+            },
+        )
+
+        return ExplainResponse(
+            success=True,
+            source="tree_shap_engine",
+            soh_shap=soh_shap,
+            rul_shap=rul_shap,
+            anomaly_shap=anomaly_shap,
+            aiAnalysis=analysis.get("aiAnalysis"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"XAI explanation failed: {e}")
+
+
+@router.post("/chat-digital-doctor", response_model=ChatDoctorResponse)
+def chat_digital_doctor_endpoint(req: ChatDoctorRequest):
+    """
+    Conversational Digital Doctor assistant strictly grounded in telemetry and TreeSHAP attributions.
+    Rejects out-of-scope queries with 'I don't know' and verifies grounded numbers.
+    """
+    try:
+        messages_list = (
+            [m.model_dump() for m in req.messages] if req.messages else None
+        )
+        result = chat_digital_doctor(
+            user_query=req.userQuery,
+            messages=messages_list,
+            context=req.context or {},
+        )
+        return ChatDoctorResponse(
+            reply=result.get("reply", ""),
+            suggestedActions=result.get("suggestedActions", []),
+            grounded=result.get("grounded", True),
+            verification_passed=result.get("verification_passed", True),
+            source=result.get("source", "deterministic_physics_fallback"),
+            shap_summary=result.get("shap_summary"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chat assistant failed: {e}")
+

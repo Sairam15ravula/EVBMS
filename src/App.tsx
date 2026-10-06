@@ -63,7 +63,12 @@ function MainApp() {
       });
       const data = await res.json();
       if (data.success && data.aiAnalysis) {
-        setAiAnalysis(data.aiAnalysis);
+        setAiAnalysis({
+          ...data.aiAnalysis,
+          soh_shap: data.aiAnalysis.soh_shap || data.soh_shap,
+          rul_shap: data.aiAnalysis.rul_shap || data.rul_shap,
+          anomaly_shap: data.aiAnalysis.anomaly_shap || data.anomaly_shap,
+        });
       }
     } catch (err) {
       console.error('Failed to fetch XAI analysis:', err);

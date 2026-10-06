@@ -105,6 +105,22 @@ export interface ScenarioPreset {
   simulatedAnomaliesCount: number;
 }
 
+export interface ShapFeatureAttribution {
+  feature: string;
+  value: number;
+  shap_attribution: number;
+  relative_importance_pct: number;
+}
+
+export interface ModelShapSummary {
+  model_name: string;
+  base_value: number;
+  prediction: number;
+  features: string[];
+  attributions: Record<string, number>;
+  details: ShapFeatureAttribution[];
+}
+
 export interface AIExplainResponse {
   summary: string;
   degradationCauses: {
@@ -121,6 +137,9 @@ export interface AIExplainResponse {
   };
   actionPlan: string[];
   estimatedRemainingYears: number;
+  soh_shap?: ModelShapSummary;
+  rul_shap?: ModelShapSummary;
+  anomaly_shap?: ModelShapSummary;
 }
 
 export interface ChatMessage {

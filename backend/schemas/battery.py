@@ -4,7 +4,7 @@ Pydantic schemas for the prediction API. Field names follow the PRD's
 doc's ML Stack table (section 5) exactly, so request bodies match what
 those docs specify as each model's primary inputs.
 """
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Set
 from pydantic import BaseModel, Field
 
 Source = Literal["trained_model", "fallback_formula", "ekf_physics_engine", "rule_engine"]
@@ -150,6 +150,65 @@ class AllPredictRequest(BaseModel):
     anomaly: Optional[AnomalyRequest] = None
     capacity: Optional[CapacityRequest] = None
     charging: Optional[ChargingRequest] = None
+
+
+class ShapFeatureAttribution(BaseModel):
+    feature: str
+    value: float
+    shap_attribution: float
+    relative_importance_pct: float
+
+
+class ModelShapSummary(BaseModel):
+    model_name: str
+    base_value: float
+    prediction: float
+    features: List[str]
+    attributions: Dict[str, float]
+    details: List[ShapFeatureAttribution]
+
+
+class ExplainRequest(BaseModel):
+    cycle: Optional[float] = 60.0
+    voltage: Optional[float] = 370.0
+    temperature: Optional[float] = 25.0
+    soc: Optional[float] = 80.0
+    current: Optional[float] = 20.0
+    hour: Optional[int] = 12
+    dayofweek: Optional[int] = 2
+    soh: Optional[float] = None
+    rul: Optional[float] = None
+    vehicle_info: Optional[Dict[str, Any]] = None
+
+
+class ExplainResponse(BaseModel):
+    success: bool = True
+    source: str = "tree_shap_engine"
+    soh_shap: ModelShapSummary
+    rul_shap: ModelShapSummary
+    anomaly_shap: ModelShapSummary
+    aiAnalysis: Optional[Dict[str, Any]] = None
+
+
+class ChatMessageSchema(BaseModel):
+    sender: str
+    text: str
+    timestamp: Optional[str] = None
+
+
+class ChatDoctorRequest(BaseModel):
+    userQuery: str
+    messages: Optional[List[ChatMessageSchema]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class ChatDoctorResponse(BaseModel):
+    reply: str
+    suggestedActions: List[str] = []
+    grounded: bool = True
+    verification_passed: bool = True
+    source: str = "deterministic_physics_fallback"
+    shap_summary: Optional[Dict[str, Any]] = None
 
 
 class ErrorResponse(BaseModel):

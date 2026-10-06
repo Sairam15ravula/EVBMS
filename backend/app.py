@@ -122,3 +122,54 @@ def health():
         "fleet_apis_enabled": True,
         "note": "Endpoints for any model marked false above will use a documented fallback formula instead of a trained model.",
     }
+
+
+@app.post("/api/explain-degradation")
+def api_explain_degradation(payload: dict):
+    """Compatibility alias for XAI degradation explanation with TreeSHAP attributions."""
+    from schemas.battery import ExplainRequest
+    from routes.predict import explain_predictions
+
+    # Extract fields whether flat or nested in vehicle/telemetry
+    telemetry = payload.get("telemetry", {})
+    health = payload.get("healthMetrics", {})
+    vehicle = payload.get("vehicle", {})
+
+    cycle = payload.get("cycle") or telemetry.get("cycleCount") or 60.0
+    voltage = payload.get("voltage") or telemetry.get("voltage") or 370.0
+    temp = payload.get("temperature") or telemetry.get("temperature") or 25.0
+    soc = payload.get("soc") or telemetry.get("soc") or 80.0
+    current = payload.get("current") or telemetry.get("current") or 20.0
+    soh = payload.get("soh") or health.get("soh")
+
+    req = ExplainRequest(
+        cycle=float(cycle),
+        voltage=float(voltage),
+        temperature=float(temp),
+        soc=float(soc),
+        current=float(current),
+        soh=float(soh) if soh is not None else None,
+        vehicle_info=vehicle or payload.get("vehicle_info"),
+    )
+    return explain_predictions(req)
+
+
+@app.post("/api/chat-digital-doctor")
+def api_chat_digital_doctor(payload: dict):
+    """Compatibility alias for grounded Digital Doctor chat with hallucination verification."""
+    from schemas.battery import ChatDoctorRequest, ChatMessageSchema
+    from routes.predict import chat_digital_doctor_endpoint
+
+    raw_msgs = payload.get("messages", [])
+    parsed_msgs = []
+    for m in raw_msgs:
+        if isinstance(m, dict) and "sender" in m and "text" in m:
+            parsed_msgs.append(ChatMessageSchema(sender=m["sender"], text=m["text"], timestamp=m.get("timestamp")))
+
+    req = ChatDoctorRequest(
+        userQuery=payload.get("userQuery", ""),
+        messages=parsed_msgs if parsed_msgs else None,
+        context=payload.get("context", {}),
+    )
+    return chat_digital_doctor_endpoint(req)
+
