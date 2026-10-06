@@ -83,6 +83,42 @@ export const AlertFeed: React.FC<AlertFeedProps> = ({
                   {anom.description}
                 </p>
 
+                {/* Predictive early-warning indicators */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  {anom.riskLevel && (
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase border ${
+                      anom.riskLevel === 'critical'
+                        ? 'bg-rose-950/80 text-rose-300 border-rose-700/60'
+                        : anom.riskLevel === 'watch'
+                        ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                        : 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+                    }`}>
+                      Risk: {anom.riskLevel}
+                    </span>
+                  )}
+                  {anom.anomalyScore != null && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                      Score: {anom.anomalyScore.toFixed(1)}/100
+                    </span>
+                  )}
+                  {anom.estimatedLeadTimeSeconds != null && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-700/60">
+                      Est. Lead-Time: ~{Math.round(anom.estimatedLeadTimeSeconds)}s
+                    </span>
+                  )}
+                </div>
+
+                {anom.contributingSignals && anom.contributingSignals.length > 0 && (
+                  <div className="mb-2 p-2 rounded bg-slate-950/70 border border-slate-800/80 text-[11px] font-mono text-slate-300">
+                    <span className="text-slate-500 font-semibold uppercase tracking-wider text-[9px] block mb-1">Contributing Signals:</span>
+                    <ul className="list-disc list-inside space-y-0.5 text-slate-300">
+                      {anom.contributingSignals.map((sig, idx) => (
+                        <li key={idx}>{sig}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between text-[11px] font-mono pt-2 border-t border-slate-800/60 gap-2">
                   <div className="text-slate-400">
                     Value: <span className="text-white font-bold">{anom.value}</span> (Threshold: {anom.threshold})

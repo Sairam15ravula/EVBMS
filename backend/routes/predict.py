@@ -103,16 +103,86 @@ def predict_rul(req: RULRequest):
 
 
 @router.post("/anomaly", response_model=AnomalyResponse)
-def predict_anomaly(req: AnomalyRequest):
+async def predict_anomaly(req: AnomalyRequest):
     try:
-        is_anom, proba, iso_flag, source = anomaly_service.predict_anomaly(
-            req.soc, req.voltage, req.current, req.hour, req.dayofweek, req.temperature, req.resistance,
+        (
+            is_anom,
+            anomaly_score,
+            risk_level,
+            contributing,
+            lead_time,
+            proba,
+            iso_flag,
+            source,
+        ) = anomaly_service.predict_anomaly(
+            soc=req.soc,
+            voltage=req.voltage,
+            current=req.current,
+            hour=req.hour,
+            dayofweek=req.dayofweek,
+            temperature=req.temperature,
+            resistance=req.resistance,
+            cell_delta_mv=req.cell_delta_mv,
+            temp_rate=req.temp_rate,
+            volt_rate=req.volt_rate,
         )
+
+        alert_persisted = False
+        alert_id = None
+
+        # Rule 3: Alerts must persist in the DB and appear in the AlertFeed
+        if is_anom or risk_level in ["watch", "critical"]:
+            try:
+                import uuid
+                from datetime import datetime, timezone
+                from backend.db.session import async_session_factory
+                from backend.db.models import AlertLogModel
+
+                v_id = req.vehicle_id or "DEMO-EV-01"
+                sev = "critical" if risk_level == "critical" else "warning" if risk_level == "watch" else "info"
+                fault_code = (
+                    "PREDICTIVE_RISK_WATCH"
+                    if risk_level == "watch"
+                    else "CRITICAL_HAZARD"
+                    if risk_level == "critical"
+                    else "TELEMETRY_ANOMALY"
+                )
+                desc = (
+                    f"Risk: {risk_level.upper()} (Score: {anomaly_score:.1f}/100). "
+                    + "; ".join(contributing[:2])
+                )
+                if lead_time is not None:
+                    desc += f" Est. lead-time: {lead_time:.0f}s."
+
+                new_alert_id = str(uuid.uuid4())
+                async with async_session_factory() as session:
+                    alert = AlertLogModel(
+                        id=new_alert_id,
+                        timestamp=datetime.now(timezone.utc),
+                        vehicle_id=v_id,
+                        severity=sev,
+                        fault_code=fault_code,
+                        description=desc,
+                        acknowledged=False,
+                    )
+                    session.add(alert)
+                    await session.commit()
+                    alert_persisted = True
+                    alert_id = new_alert_id
+            except Exception as dbe:
+                print(f"[predict-anomaly] DB alert persistence note: {dbe}")
+
         return AnomalyResponse(
             is_anomaly=is_anom,
+            anomaly_score=round(anomaly_score, 1),
+            risk_level=risk_level,
+            contributing_signals=contributing,
+            estimated_lead_time_seconds=round(lead_time, 1) if lead_time is not None else None,
             anomaly_probability=round(proba, 4) if proba is not None else None,
             isolation_forest_flag=iso_flag,
             source=source,
+            alert_persisted=alert_persisted,
+            alert_id=alert_id,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Anomaly prediction failed: {e}")
@@ -137,7 +207,7 @@ def predict_charging(req: ChargingRequest):
 
 
 @router.post("/all")
-def predict_all(req: AllPredictRequest):
+async def predict_all(req: AllPredictRequest):
     out = {}
     if req.soc_ekf:
         out["soc_ekf"] = predict_soc_ekf(req.soc_ekf)
@@ -146,7 +216,7 @@ def predict_all(req: AllPredictRequest):
     if req.rul:
         out["rul"] = predict_rul(req.rul)
     if req.anomaly:
-        out["anomaly"] = predict_anomaly(req.anomaly)
+        out["anomaly"] = await predict_anomaly(req.anomaly)
     if req.capacity:
         out["capacity"] = predict_capacity(req.capacity)
     if req.charging:
@@ -157,7 +227,7 @@ def predict_all(req: AllPredictRequest):
 
 
 @router.post("/batch", response_model=BatchPredictResponse)
-def predict_batch(req: BatchPredictRequest):
+async def predict_batch(req: BatchPredictRequest):
     """
     Process multiple predictions in batches of 10.
 
@@ -175,7 +245,7 @@ def predict_batch(req: BatchPredictRequest):
         chunk = predictions[i : i + chunk_size]
         for pred in chunk:
             try:
-                result = predict_all(pred)
+                result = await predict_all(pred)
                 results.append({"status": "success", "data": result})
                 successful += 1
             except HTTPException as e:

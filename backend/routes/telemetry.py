@@ -21,7 +21,23 @@ async def ingest_telemetry_frame(
 ):
     """Ingest a live telemetry frame and persist to TimescaleDB hypertable."""
     telemetry_repo = TelemetryRepository(session)
-    frame = await telemetry_repo.insert_frame(req.model_dump())
+    frame_dict = req.model_dump()
+    frame = await telemetry_repo.insert_frame(frame_dict)
+
+    # Automatically evaluate and persist diagnostic alerts from telemetry
+    try:
+        from backend.services.alert_engine import generate_alerts_from_telemetry
+        alerts = generate_alerts_from_telemetry(frame_dict)
+        for a in alerts:
+            await telemetry_repo.log_alert(
+                vehicle_id=a["vehicle_id"],
+                severity=a["severity"],
+                fault_code=a["fault_code"],
+                description=a["description"],
+            )
+    except Exception as e:
+        print(f"[telemetry-ingest] Alert generation error: {e}")
+
     return frame
 
 

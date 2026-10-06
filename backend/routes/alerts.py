@@ -3,6 +3,7 @@ Diagnostic alert logs and fault code management router.
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +37,37 @@ async def list_alert_logs(
     query = query.order_by(desc(AlertLogModel.timestamp)).offset(offset).limit(limit)
     result = await session.execute(query)
     return list(result.scalars().all())
+
+
+class AlertCreateRequest(BaseModel):
+    vehicle_id: str
+    severity: str = "warning"
+    fault_code: str
+    description: str
+
+
+@router.post("", response_model=AlertLogResponse, status_code=status.HTTP_201_CREATED)
+async def create_alert(
+    req: AlertCreateRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Create and persist a diagnostic alert log in the database."""
+    import uuid
+    from datetime import datetime, timezone
+
+    alert = AlertLogModel(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        vehicle_id=req.vehicle_id,
+        severity=req.severity,
+        fault_code=req.fault_code,
+        description=req.description,
+        acknowledged=False,
+    )
+    session.add(alert)
+    await session.commit()
+    await session.refresh(alert)
+    return alert
 
 
 @router.patch("/{alert_id}/acknowledge", response_model=AlertAcknowledgeResponse)

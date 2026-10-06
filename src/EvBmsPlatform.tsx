@@ -530,6 +530,10 @@ function OverviewScreen({
     interval_width?: number;
     soc_ekf?: number;
     is_anomaly?: boolean;
+    anomaly_score?: number;
+    risk_level?: 'normal' | 'watch' | 'critical';
+    contributing_signals?: string[];
+    estimated_lead_time_seconds?: number;
     source?: string;
     loading: boolean;
   }>({ loading: true });
@@ -575,6 +579,7 @@ function OverviewScreen({
               dayofweek: vehicle.last.dayofweek,
               temperature: vehicle.last.temp,
               resistance: vehicle.last.resistance,
+              vehicle_id: vehicle.id,
             },
           }),
         });
@@ -589,6 +594,10 @@ function OverviewScreen({
             interval_width: data.rul?.interval_width,
             soc_ekf: data.soc_ekf?.estimated_soc_pct,
             is_anomaly: data.anomaly?.is_anomaly,
+            anomaly_score: data.anomaly?.anomaly_score,
+            risk_level: data.anomaly?.risk_level,
+            contributing_signals: data.anomaly?.contributing_signals,
+            estimated_lead_time_seconds: data.anomaly?.estimated_lead_time_seconds,
             source: data.soh?.source || "trained_model",
             loading: false,
           });
@@ -911,9 +920,22 @@ function AlertsScreen({ vehicle }: { vehicle: BatteryVehicle }) {
           {vehicle.anomalies.map((a, i) => (
             <div key={i} style={{ display: "flex", gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceAlt }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: COLORS.textPrimary, fontSize: 13.5 }}>Abnormal {a.feature}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, color: COLORS.textPrimary, fontSize: 13.5 }}>Abnormal {a.feature}</span>
+                  <span style={{
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    background: a.score > 2.0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
+                    color: a.score > 2.0 ? COLORS.red : COLORS.amber,
+                    fontWeight: 700,
+                  }}>
+                    {a.score > 2.0 ? "CRITICAL RISK" : "WATCH"} · SCORE {a.score.toFixed(1)}
+                  </span>
+                </div>
                 <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 3 }}>
-                  Detected at cycle {a.cycle} · score {a.score}
+                  Detected at cycle {a.cycle} · Early warning lead-time horizon: ~{Math.round(Math.max(45, (4 - a.score) * 60))}s
                 </div>
               </div>
             </div>

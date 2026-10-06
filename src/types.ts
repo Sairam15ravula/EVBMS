@@ -48,6 +48,10 @@ export interface BatteryAnomaly {
   value: string;
   threshold: string;
   recommendation: string;
+  anomalyScore?: number;
+  riskLevel?: 'normal' | 'watch' | 'critical';
+  contributingSignals?: string[];
+  estimatedLeadTimeSeconds?: number;
 }
 
 export interface HealthMetrics {

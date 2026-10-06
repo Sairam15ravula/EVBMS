@@ -85,7 +85,11 @@ export function detectAnomalies(
       parameter: 'Temperature',
       value: `${telemetry.temperature}°C`,
       threshold: '< 45.0°C',
-      recommendation: 'Reduce current draw immediately. Activate max active liquid cooling or park in shade.'
+      recommendation: 'Reduce current draw immediately. Activate max active liquid cooling or park in shade.',
+      anomalyScore: 88.5,
+      riskLevel: 'critical',
+      contributingSignals: [`Temperature ${telemetry.temperature}°C exceeds 52°C threshold`, 'Cooling loop saturated'],
+      estimatedLeadTimeSeconds: 45,
     });
   } else if (telemetry.temperature >= 44) {
     anomalies.push({
@@ -98,7 +102,11 @@ export function detectAnomalies(
       parameter: 'Temperature',
       value: `${telemetry.temperature}°C`,
       threshold: '< 40.0°C',
-      recommendation: 'Throttle charging rate from DCFC to AC 11kW until pack temperature drops below 35°C.'
+      recommendation: 'Throttle charging rate from DCFC to AC 11kW until pack temperature drops below 35°C.',
+      anomalyScore: 58.0,
+      riskLevel: 'watch',
+      contributingSignals: [`Temperature ${telemetry.temperature}°C breaches 44°C watch boundary`, 'Thermal gradient rising'],
+      estimatedLeadTimeSeconds: 240,
     });
   }
 
@@ -114,7 +122,11 @@ export function detectAnomalies(
       parameter: 'Charge Current @ Low Temp',
       value: `${telemetry.current}A @ ${telemetry.temperature}°C`,
       threshold: '< 15A when Temp < 5°C',
-      recommendation: 'Precondition battery using heat pump before plugging into DC Fast Charger.'
+      recommendation: 'Precondition battery using heat pump before plugging into DC Fast Charger.',
+      anomalyScore: 54.0,
+      riskLevel: 'watch',
+      contributingSignals: [`Sub-zero temp ${telemetry.temperature}°C`, `High charge current ${telemetry.current}A`],
+      estimatedLeadTimeSeconds: 300,
     });
   }
 
@@ -131,7 +143,11 @@ export function detectAnomalies(
       parameter: 'Internal Resistance',
       value: `${telemetry.internalResistance} mΩ`,
       threshold: `< ${(rBaseline * 1.25).toFixed(1)} mΩ`,
-      recommendation: 'Avoid peak current accelerations to minimize heat generation in resistive cells.'
+      recommendation: 'Avoid peak current accelerations to minimize heat generation in resistive cells.',
+      anomalyScore: 62.0,
+      riskLevel: 'watch',
+      contributingSignals: [`Resistance ${telemetry.internalResistance} mΩ vs ${rBaseline} mΩ baseline`, 'Joule heating risk'],
+      estimatedLeadTimeSeconds: 180,
     });
   }
 
@@ -147,7 +163,11 @@ export function detectAnomalies(
       parameter: 'Voltage',
       value: `${telemetry.voltage} V`,
       threshold: `> ${(vehicle.nominalVoltageV * 0.85).toFixed(0)} V`,
-      recommendation: 'Limit aggressive power throttle usage until cell balance is restored.'
+      recommendation: 'Limit aggressive power throttle usage until cell balance is restored.',
+      anomalyScore: 65.0,
+      riskLevel: 'watch',
+      contributingSignals: [`Pack voltage ${telemetry.voltage}V < ${(vehicle.nominalVoltageV * 0.85).toFixed(0)}V limit`, `High discharge current ${telemetry.current}A`],
+      estimatedLeadTimeSeconds: 90,
     });
   }
 

@@ -9,10 +9,10 @@
     "voltage",
     "current"
   ],
-  "training_timestamp": "2026-10-05T15:55:51.308922+00:00",
+  "training_timestamp": "2026-10-06T07:11:26.912256+00:00",
   "validation_metrics": {
     "contamination": 0.01
   },
-  "sha256": "4c00fe7a2d0bf79863f6a2459308bf3a1269729cf8db7493c3791b5eb5a4ec9c",
+  "sha256": "871b062fd7eb39bc889c6eb393bde78eec6073d5156997dea0f3bc7e5f6059b2",
   "scikit_learn_version": "1.9.1"
 }

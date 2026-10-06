@@ -236,6 +236,8 @@ def run_training() -> None:
     telemetry_df = telemetry_df.dropna(subset=["timestamp"]).copy()
     telemetry_df["hour"] = telemetry_df["timestamp"].dt.hour
     telemetry_df["dayofweek"] = telemetry_df["timestamp"].dt.dayofweek
+    # Normalize 14S pack voltage to universal cell equivalent (3.0V - 4.2V)
+    telemetry_df["voltage"] = telemetry_df["voltage"] / 14.0
 
     iso_features = ["soc", "voltage", "current"]
     iso_model = Pipeline(
@@ -257,7 +259,7 @@ def run_training() -> None:
     iso_preds = iso_model.named_steps["isolation_forest"].predict(
         iso_model.named_steps["scaler"].transform(telemetry_df[iso_features])
     )
-    is_anom_ground_truth = ((iso_preds == -1) | (telemetry_df["voltage"] < 10)).astype(int)
+    is_anom_ground_truth = ((iso_preds == -1) | (telemetry_df["voltage"] < 2.5)).astype(int)
 
     X_anom_tr, X_anom_te, y_anom_tr, y_anom_te = train_test_split(
         telemetry_df[telemetry_features], is_anom_ground_truth, test_size=0.2, random_state=42, stratify=is_anom_ground_truth

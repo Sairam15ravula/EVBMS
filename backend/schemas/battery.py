@@ -66,17 +66,27 @@ class AnomalyRequest(BaseModel):
     soc: float = Field(..., ge=0, le=100)
     voltage: float
     current: float
-    hour: int = Field(..., ge=0, le=23)
-    dayofweek: int = Field(..., ge=0, le=6)
+    hour: int = Field(12, ge=0, le=23)
+    dayofweek: int = Field(2, ge=0, le=6)
     temperature: Optional[float] = None
     resistance: Optional[float] = None
+    cell_delta_mv: Optional[float] = None
+    vehicle_id: Optional[str] = None
+    temp_rate: Optional[float] = None
+    volt_rate: Optional[float] = None
 
 
 class AnomalyResponse(BaseModel):
     is_anomaly: bool
+    anomaly_score: float = Field(0.0, description="Continuous predictive anomaly score (0 - 100)")
+    risk_level: Literal["normal", "watch", "critical"] = Field("normal", description="Risk category: normal, watch, or critical")
+    contributing_signals: list[str] = Field(default_factory=list, description="Contributing telemetry signals with quantitative evidence")
+    estimated_lead_time_seconds: Optional[float] = Field(None, description="Estimated lead time in seconds before critical failure")
     anomaly_probability: Optional[float] = None
     isolation_forest_flag: Optional[bool] = None
     source: Source
+    alert_persisted: bool = False
+    alert_id: Optional[str] = None
 
 
 class CapacityRequest(BaseModel):
