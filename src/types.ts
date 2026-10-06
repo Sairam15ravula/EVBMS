@@ -130,3 +130,18 @@ export interface ChatMessage {
   timestamp: string;
   suggestedActions?: string[];
 }
+
+export interface ChargingStrategyRecommendation {
+  charging_class: string;
+  confidence?: number;
+  source: string;
+  target_soc_min: number;
+  target_soc_max: number;
+  target_soc_window: [number, number];
+  suggested_charge_rate_kw: number;
+  suggested_charge_type: string;
+  priority_mode: 'protect_battery_life' | 'need_range_soon';
+  reason: string;
+  explanation_link: string;
+}
+

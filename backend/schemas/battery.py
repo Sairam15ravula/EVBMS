@@ -4,10 +4,10 @@ Pydantic schemas for the prediction API. Field names follow the PRD's
 doc's ML Stack table (section 5) exactly, so request bodies match what
 those docs specify as each model's primary inputs.
 """
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
-Source = Literal["trained_model", "fallback_formula", "ekf_physics_engine"]
+Source = Literal["trained_model", "fallback_formula", "ekf_physics_engine", "rule_engine"]
 
 
 class EkfSoCRequest(BaseModel):
@@ -99,24 +99,48 @@ class CapacityResponse(BaseModel):
 
 
 class ChargingRequest(BaseModel):
-    SOC: float
-    Voltage: float
-    Current: float
-    Battery_Temp: float
-    Ambient_Temp: float
-    Charging_Duration: float
-    Degradation_Rate: float
-    Charging_Mode: str = Field(..., description="'AC' or 'DC Fast'")
-    Efficiency: float
-    Battery_Type: str = Field(..., description="e.g. 'NMC' or 'LFP'")
-    Charging_Cycles: float
-    EV_Model: str
+    # Support both legacy uppercase fields and clean snake_case fields
+    SOC: Optional[float] = None
+    soc: Optional[float] = None
+    Voltage: Optional[float] = 380.0
+    voltage: Optional[float] = None
+    Current: Optional[float] = 0.0
+    current: Optional[float] = None
+    Battery_Temp: Optional[float] = None
+    temperature: Optional[float] = None
+    Ambient_Temp: Optional[float] = 22.0
+    ambient_temp: Optional[float] = None
+    Charging_Duration: Optional[float] = 30.0
+    charging_duration: Optional[float] = None
+    Degradation_Rate: Optional[float] = 0.02
+    degradation_trend: Optional[float] = None
+    Charging_Mode: Optional[str] = "AC"
+    charging_mode: Optional[str] = None
+    Efficiency: Optional[float] = 0.92
+    Battery_Type: Optional[str] = "NMC"
+    battery_type: Optional[str] = None
+    Charging_Cycles: Optional[float] = 100.0
+    EV_Model: Optional[str] = "Generic EV"
+    ev_model: Optional[str] = None
+    soh: Optional[float] = 90.0
+    priority_mode: Optional[str] = Field(
+        default="protect_battery_life",
+        description="'protect_battery_life' (longevity) or 'need_range_soon' (fast replenishment)",
+    )
 
 
 class ChargingResponse(BaseModel):
     charging_class: str
     confidence: Optional[float] = None
     source: Source
+    target_soc_min: float = 20.0
+    target_soc_max: float = 80.0
+    target_soc_window: List[float] = [20.0, 80.0]
+    suggested_charge_rate_kw: float = 11.0
+    suggested_charge_type: str = "AC Level 2 (Slow, 11 kW)"
+    priority_mode: str = "protect_battery_life"
+    reason: str = ""
+    explanation_link: str = "#digital-doctor"
 
 
 class AllPredictRequest(BaseModel):

@@ -200,10 +200,10 @@ def predict_capacity(req: CapacityRequest):
 @router.post("/charging", response_model=ChargingResponse)
 def predict_charging(req: ChargingRequest):
     try:
-        label, proba, source = charging_service.predict_charging(req.model_dump())
-        return ChargingResponse(charging_class=label, confidence=round(proba, 4) if proba is not None else None, source=source)
+        rec = charging_service.get_charging_recommendation(req.model_dump())
+        return ChargingResponse(**rec)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Charging classification failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Charging recommendation failed: {e}")
 
 
 @router.post("/all")

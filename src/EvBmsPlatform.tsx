@@ -887,12 +887,143 @@ function DegradationScreen({ vehicle }: { vehicle: BatteryVehicle }) {
   );
 }
 
-function ChargingScreen({ vehicle }: { vehicle: BatteryVehicle }) {
+function ChargingScreen({ vehicle, onOpenDoctor }: { vehicle: BatteryVehicle; onOpenDoctor?: () => void }) {
   const latest = vehicle.sessions[0];
   const toneColor: Record<string, string> = { green: COLORS.green, amber: COLORS.amber, red: COLORS.red, blue: "#5FB8E0" };
+  const [priorityMode, setPriorityMode] = useState<"protect_battery_life" | "need_range_soon">("protect_battery_life");
+
+  const isRange = priorityMode === "need_range_soon";
+  const temp = vehicle.last.temp;
+  const soh = vehicle.soh;
+  const soc = 82;
+
+  // Concrete Strategy Recommendation
+  let targetMin = isRange ? 10 : 20;
+  let targetMax = isRange ? 95 : 80;
+  let rateKw = isRange ? 120 : 11;
+  let chargeType = isRange ? `DC Fast (${rateKw} kW)` : `AC Level 2 (${rateKw} kW)`;
+  const reasons: string[] = [];
+
+  if (isRange) {
+    reasons.push("Range Priority Mode: Maximizing usable driving range with high-power fast charging.");
+  } else {
+    reasons.push("Longevity Mode: Restricting daily cycling to 20%–80% buffer minimizes cathode lattice strain and slows SEI growth.");
+  }
+
+  if (soh < 80) {
+    if (!isRange) {
+      targetMax = Math.min(targetMax, 75);
+      rateKw = Math.min(rateKw, 7.4);
+      chargeType = `AC Level 2 (Gentle, ${rateKw} kW)`;
+      reasons.push(`Low SoH (${soh.toFixed(1)}% < 80%): Charge window contracted to ${targetMin}%–${targetMax}% and power limited to ${rateKw} kW to reduce I²R heating and microcrack propagation.`);
+    } else {
+      targetMax = Math.min(targetMax, 85);
+      rateKw = Math.min(rateKw, 50);
+      chargeType = "DC Fast (Capped at 50 kW for High Impedance)";
+      reasons.push(`Degraded Pack (${soh.toFixed(1)}% SoH): Fast charge capped at 50 kW and max charge limited to 85% to protect degraded electrodes.`);
+    }
+  }
+
+  if (temp >= 42) {
+    targetMax = Math.min(targetMax, isRange ? 80 : 75);
+    rateKw = Math.min(rateKw, 7.4);
+    chargeType = `AC Level 2 (Thermal Throttled, ${rateKw} kW)`;
+    reasons.push(`HOT PACK OVERRIDE (${temp.toFixed(1)}°C >= 42°C): Fast charging disabled and rate throttled to 7.4 kW to prevent thermal runaway hazard.`);
+  } else if (temp >= 36 && isRange) {
+    rateKw = Math.min(rateKw, 50);
+    chargeType = "DC Fast (Thermal Throttled, 50 kW)";
+    reasons.push(`Elevated temperature (${temp.toFixed(1)}°C): Fast charge throttled to 50 kW to avoid exceeding safety ceiling.`);
+  } else if (temp < 5) {
+    rateKw = Math.min(rateKw, 7.4);
+    chargeType = `AC Level 2 (Cold Throttled, ${rateKw} kW)`;
+    reasons.push(`COLD PACK OVERRIDE (${temp.toFixed(1)}°C < 5°C): Low temperature impedes Li+ intercalation. Fast charging disabled to avoid lithium plating.`);
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Recommended Strategy Card */}
+      <SectionCard title="Recommended Charging Strategy" icon={Zap}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Mode Selector */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: COLORS.surfaceAlt, padding: 4, borderRadius: 10, border: `1px solid ${COLORS.border}` }}>
+            <button
+              onClick={() => setPriorityMode("protect_battery_life")}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "8px 12px", borderRadius: 8, border: priorityMode === "protect_battery_life" ? `1px solid ${COLORS.green}` : "1px solid transparent",
+                background: priorityMode === "protect_battery_life" ? "rgba(34,217,122,0.15)" : "transparent",
+                color: priorityMode === "protect_battery_life" ? COLORS.green : COLORS.textSecondary,
+                fontWeight: 700, fontSize: 12, cursor: "pointer"
+              }}
+            >
+              <ShieldCheck size={14} /> Protect Battery Life
+            </button>
+            <button
+              onClick={() => setPriorityMode("need_range_soon")}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "8px 12px", borderRadius: 8, border: priorityMode === "need_range_soon" ? `1px solid ${COLORS.amber}` : "1px solid transparent",
+                background: priorityMode === "need_range_soon" ? "rgba(245,165,36,0.15)" : "transparent",
+                color: priorityMode === "need_range_soon" ? COLORS.amber : COLORS.textSecondary,
+                fontWeight: 700, fontSize: 12, cursor: "pointer"
+              }}
+            >
+              <Zap size={14} /> Need Range Soon
+            </button>
+          </div>
+
+          {/* Metric Pills */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                <Battery size={13} color={COLORS.green} /> Target SoC Window
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>
+                {targetMin}% – {targetMax}%
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                Current SoC: ~{soc}%
+              </div>
+            </div>
+
+            <div style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                <Zap size={13} color={COLORS.amber} /> Suggested Charge Rate
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>
+                {rateKw} kW
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.textSecondary, marginTop: 2 }}>
+                {chargeType}
+              </div>
+            </div>
+          </div>
+
+          {/* Plain Language Rationale */}
+          <div style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, fontSize: 12, lineHeight: 1.5, color: COLORS.textPrimary }}>
+            <div style={{ fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4, fontSize: 11, textTransform: "uppercase" }}>
+              Decision Rationale (SoH {soh.toFixed(1)}% · Temp {temp.toFixed(1)}°C)
+            </div>
+            <div>{reasons.join(" ")}</div>
+          </div>
+
+          {onOpenDoctor && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={onOpenDoctor}
+                style={{
+                  background: "none", border: "none", color: "#5FB8E0",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "underline"
+                }}
+              >
+                View AI Explanation & Telemetry Grounding →
+              </button>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Most recent session card */}
       <SectionCard title="Most recent charging session" icon={Plug}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 22, alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1151,7 +1282,9 @@ export default function EvBmsPlatform() {
               {screen === "health" && <BatteryHealthScreen vehicle={vehicle} />}
               {screen === "telemetry" && <TelemetryScreen vehicle={vehicle} />}
               {screen === "degradation" && <DegradationScreen vehicle={vehicle} />}
-              {screen === "charging" && <ChargingScreen vehicle={vehicle} />}
+              {screen === "charging" && (
+                <ChargingScreen vehicle={vehicle} onOpenDoctor={() => setDoctorOpen(true)} />
+              )}
               {screen === "alerts" && <AlertsScreen vehicle={vehicle} />}
             </>
           )}
