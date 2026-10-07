@@ -9,6 +9,8 @@ coverage/
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
+.coverage.*
 evbms/
 *.db
 *.sqlite

@@ -82,7 +82,7 @@ export const DigitalDoctorDrawer: React.FC<DigitalDoctorDrawerProps> = ({
 
   // Auto scroll to bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
   // Handle initial prompt if passed
@@ -207,6 +207,7 @@ export const DigitalDoctorDrawer: React.FC<DigitalDoctorDrawerProps> = ({
             </span>
             <button
               onClick={onClose}
+              aria-label="close drawer"
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
             >
               <X className="w-5 h-5" />
@@ -218,7 +219,7 @@ export const DigitalDoctorDrawer: React.FC<DigitalDoctorDrawerProps> = ({
         <div className="px-4 py-2 bg-indigo-950/40 border-b border-indigo-900/40 flex items-center justify-between text-[11px] font-mono text-indigo-300">
           <span>RUL: {effHealth.rulYears} yrs ({effHealth.rulCycles} cyc)</span>
           <span className="text-emerald-400">✓ Grounded Diagnostics</span>
-          <span>Flags: {effHealth.anomalies.length} Active</span>
+          <span>Flags: {(effHealth.anomalies || []).length} Active</span>
         </div>
 
         {/* Message Feed */}

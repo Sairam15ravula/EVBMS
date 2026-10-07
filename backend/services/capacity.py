@@ -5,7 +5,10 @@ per-cell SoH model on purpose (see training/train_all.py's note on this
 model's R²).
 """
 import pandas as pd
-from services._loader import load
+try:
+    from backend.services._loader import load
+except ImportError:
+    from services._loader import load
 
 _bundle = load("capacity_fade_model.joblib")
 
